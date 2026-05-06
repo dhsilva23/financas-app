@@ -260,6 +260,25 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <div style="position:relative;width:100%;height:180px;"><canvas id="poupChart"></canvas></div>
         <div class="sec-lbl" style="margin-top:14px;">histórico recente</div>
         <div class="txl" id="poup-txs"></div>
+        <button id="poup-update-btn" onclick="document.getElementById('poup-form').style.display='block';this.style.display='none'" style="display:none;width:100%;margin-top:14px;padding:13px;background:var(--green);color:white;border:none;border-radius:var(--r-md);font-size:14px;font-weight:600;cursor:pointer;">+ Atualizar saldo da poupança</button>
+        <div id="poup-form" style="display:none;margin-top:12px;">
+          <div class="card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Atualizar poupança</div>
+            <div class="fg"><label>Mês de referência</label>
+              <select id="poup-mes">
+                <option>Janeiro 2026</option><option>Fevereiro 2026</option><option>Março 2026</option>
+                <option selected>Abril 2026</option><option>Maio 2026</option><option>Junho 2026</option>
+                <option>Julho 2026</option><option>Agosto 2026</option><option>Setembro 2026</option>
+                <option>Outubro 2026</option><option>Novembro 2026</option><option>Dezembro 2026</option>
+              </select>
+            </div>
+            <div class="fg"><label>Saldo total atual (R$)</label><input type="text" inputmode="decimal" id="poup-saldo" placeholder="19.090,06" oninput="maskCurrency(this)"></div>
+            <div class="fg"><label>Aporte no mês (R$)</label><input type="text" inputmode="decimal" id="poup-aporte" placeholder="0,00" oninput="maskCurrency(this)"></div>
+            <div class="fg"><label>Rendimento no mês (R$)</label><input type="text" inputmode="decimal" id="poup-rend" placeholder="0,00" oninput="maskCurrency(this)"></div>
+            <button class="sbtn" onclick="savePoupanca()">✓ Salvar</button>
+            <button class="bbtn" onclick="document.getElementById('poup-form').style.display='none';document.getElementById('poup-update-btn').style.display='block'">Cancelar</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -275,7 +294,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           <div class="fg"><label>Valor (R$)</label><input type="text" inputmode="decimal" placeholder="0,00" id="inp-val" style="font-size:22px;font-weight:600;" oninput="maskCurrency(this)"></div>
           <div class="fg"><label>Descrição</label><input type="text" placeholder="Ex: Salão, Mercado, Hotel..." id="inp-desc"></div>
           <div class="fg" id="fg-cat"><label>Categoria</label>
-            <select id="inp-cat">
+            <select id="inp-cat" onchange="checkReimbField()">
               <option>Moradia</option><option>Casa & Decoração</option><option>Alimentação</option>
               <option>Transporte</option><option>Saúde</option><option>Beleza & Cuidados</option>
               <option>Moda & Acessórios</option><option>Lazer</option><option>Viagens (pessoal)</option>
@@ -285,6 +304,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           </div>
           <div class="fg"><label>Data <span style="font-size:10px;color:var(--text3);">(futura = projeção automática)</span></label><input type="date" id="inp-date"></div>
           <div class="fg"><label>Observação (opcional)</label><input type="text" id="inp-obs" placeholder="Ex: parcela 1/3, reembolso pendente..."></div>
+          <div class="fg" id="fg-reimb-date" style="display:none;">
+            <label>Data estimada do reembolso</label>
+            <input type="date" id="inp-reimb-date">
+            <div style="font-size:10px;color:var(--text3);margin-top:4px;">O valor será adicionado como receita projetada neste mês</div>
+          </div>
           <button class="sbtn" onclick="goStep2()">Continuar →</button>
           <button class="bbtn" id="delete-btn" style="display:none;color:var(--red);" onclick="confirmDelete()">🗑 Excluir lançamento</button>
           <button class="bbtn" onclick="cancelEdit()">Cancelar</button>
@@ -755,32 +779,45 @@ function setCCMonthRender(m) {
 // ── SWILE ────────────────────────────────────────────────
 function renderSwile() {
   const ml = curMonthLabel();
-  const monthRow = swileData.find(r=>r[0]===ml);
-  const credito = monthRow ? parseVal(monthRow[1]) : 1000;
-  const gastos = swileData.filter(r=>r[7]==='Gasto').reduce((s,r)=>s+parseVal(r[6]),0);
-  const saldo = credito - gastos;
+  const ml_lower = ml.toLowerCase();
+  // Crédito fixo de R$1.000/mês
+  const CREDITO_FIXO = 1000;
+  // Gastos Swile do mês — from Lancamentos where meio='Swile'
+  const swileGastosTx = txData.filter(r =>
+    (r[7]||'').toLowerCase() === ml_lower && (r[5]||'') === 'Swile' && r[1] === 'Gasto'
+  );
+  const gastos = swileGastosTx.reduce((s,r)=>s+parseVal(r[4]),0);
+  // Crédito recebido este mês — from Lancamentos where meio='Crédito Swile'
+  const creditoTx = txData.filter(r =>
+    (r[7]||'').toLowerCase() === ml_lower && (r[5]||'') === 'Crédito Swile'
+  );
+  const creditoRecebido = creditoTx.length > 0
+    ? creditoTx.reduce((s,r)=>s+parseVal(r[4]),0)
+    : CREDITO_FIXO; // assume fixo se ainda não lançou
+  const saldo = creditoRecebido - gastos;
+
   document.getElementById('swile-saldo').textContent = fmt(saldo);
-  document.getElementById('swile-sub').textContent = `Mês: ${ml} · Crédito: ${fmt(credito)}`;
+  document.getElementById('swile-sub').textContent = `Mês: ${ml} · Crédito: ${fmt(creditoRecebido)}`;
   document.getElementById('swile-stats').innerHTML = `
     <div class="sc"><div class="sl">Usado no mês</div><div class="sv dn">${fmt(gastos)}</div></div>
     <div class="sc"><div class="sl">Disponível</div><div class="sv up">${fmt(saldo)}</div></div>
-    <div class="sc"><div class="sl">Crédito mensal</div><div class="sv">${fmt(credito)}</div></div>
-    <div class="sc"><div class="sl">Aproveitamento</div><div class="sv">${credito>0?Math.round(gastos/credito*100):0}%</div></div>
+    <div class="sc"><div class="sl">Crédito mensal</div><div class="sv">R$1.000,00</div></div>
+    <div class="sc"><div class="sl">Aproveitamento</div><div class="sv">${creditoRecebido>0?Math.round(gastos/creditoRecebido*100):0}%</div></div>
   `;
-  const swGastos = swileData.filter(r=>r[7]==='Gasto');
-  document.getElementById('swile-txs').innerHTML = swGastos.length
-    ? swGastos.map(r=>`<div class="tx">
-        <div class="tx-ico" style="background:#E8F5E9;"><i class="ti ti-leaf" style="color:#2E7D32;"></i></div>
-        <div class="tx-info"><div class="tx-desc">${r[5]||''}</div><div class="tx-meta">Alimentação · ${r[4]||''}</div></div>
-        <div class="tx-r"><div class="tx-amt exp">−${fmt(r[6])}</div></div>
+  document.getElementById('swile-txs').innerHTML = swileGastosTx.length
+    ? swileGastosTx.map((r,i)=> txRow(r, txData.indexOf(r), 'Lancamentos')).join('')
+    : '<div class="empty">Nenhum gasto Swile este mês</div>';
+  document.getElementById('swile-credits').innerHTML = creditoTx.length
+    ? creditoTx.map(r=>`<div class="tx">
+        <div class="tx-ico" style="background:#E8F5E9;"><i class="ti ti-coin" style="color:#2E7D32;"></i></div>
+        <div class="tx-info"><div class="tx-desc">Crédito Swile</div><div class="tx-meta">${r[0]||''}</div></div>
+        <div class="tx-r"><div class="tx-amt inc">+${fmt(r[4])}</div></div>
       </div>`).join('')
-    : '<div class="empty">Nenhum gasto registrado</div>';
-  const swCredits = swileData.filter(r=>r[7]==='Crédito');
-  document.getElementById('swile-credits').innerHTML = swCredits.map(r=>`<div class="tx">
-    <div class="tx-ico" style="background:#E8F5E9;"><i class="ti ti-coin" style="color:#2E7D32;"></i></div>
-    <div class="tx-info"><div class="tx-desc">${r[5]||''}</div><div class="tx-meta">${r[4]||''}</div></div>
-    <div class="tx-r"><div class="tx-amt inc">+${fmt(r[6])}</div></div>
-  </div>`).join('');
+    : `<div class="tx">
+        <div class="tx-ico" style="background:#E8F5E9;"><i class="ti ti-coin" style="color:#2E7D32;"></i></div>
+        <div class="tx-info"><div class="tx-desc">Crédito Swile</div><div class="tx-meta">Fixo mensal — lance quando receber</div></div>
+        <div class="tx-r"><div class="tx-amt inc">+R$1.000,00</div></div>
+      </div>`;
 }
 
 // ── REEMBOLSOS ───────────────────────────────────────────
@@ -943,6 +980,30 @@ function renderPoup() {
       <div class="tx-info"><div class="tx-desc">${r[0]}</div><div class="tx-meta">Aporte: ${fmt(r[2])} · Rendimento: ${fmt(r[3])}</div></div>
       <div class="tx-r"><div class="tx-amt inc">${fmt(r[1])}</div></div>
     </div>`).join('');
+
+  // Update button
+  const updateBtn = document.getElementById('poup-update-btn');
+  if (updateBtn) updateBtn.style.display = 'block';
+}
+
+async function savePoupanca() {
+  const mes = document.getElementById('poup-mes').value;
+  const saldoN = parseVal(document.getElementById('poup-saldo').value);
+  const aporteN = parseVal(document.getElementById('poup-aporte').value || '0');
+  const rendN = parseVal(document.getElementById('poup-rend').value || '0');
+  if (!mes || !saldoN) { showToast('Preencha o mês e o saldo.'); return; }
+  // Check if month already exists → update, else append
+  const existIdx = poupData.findIndex(r => (r[0]||'').toLowerCase() === mes.toLowerCase());
+  const row = [mes, saldoN, aporteN, rendN, '', ''];
+  showToast('Salvando poupança...');
+  if (existIdx >= 0) {
+    await updateRow('Poupanca', existIdx + 2, row);
+  } else {
+    await appendRow('Poupanca', row);
+  }
+  await loadAll();
+  document.getElementById('poup-form').style.display = 'none';
+  showToast('Poupança atualizada! ✓');
 }
 
 // ── ADD / EDIT FORM ──────────────────────────────────────
@@ -964,6 +1025,13 @@ function setType(t) {
   document.getElementById('btn-exp').className = 'tbtn' + (t==='exp'?' aexp':'');
   document.getElementById('btn-inc').className = 'tbtn' + (t==='inc'?' ainc':'');
   document.getElementById('fg-cat').style.display = t==='inc'?'none':'block';
+  checkReimbField();
+}
+function checkReimbField() {
+  const cat = document.getElementById('inp-cat').value;
+  const isReimb = cat === 'Despesa Reembolsável';
+  const el = document.getElementById('fg-reimb-date');
+  if (el) el.style.display = isReimb ? 'block' : 'none';
 }
 function goStep1() {
   document.getElementById('step1').classList.add('active');
@@ -1012,6 +1080,16 @@ async function submitTx() {
     ccRow = [dateFormatted, desc, cat, rawVal, parc, parcVal, fatura, isProj==='Sim'?'Projeção':'Em aberto', obs];
   }
 
+  // Reembolso date
+  const reimbDate = document.getElementById('inp-reimb-date')?.value;
+  let reimbRow = null;
+  if (cat === 'Despesa Reembolsável' && reimbDate) {
+    const rdParts = reimbDate.split('-');
+    const rdFormatted = `${rdParts[2]}/${rdParts[1]}/${rdParts[0]}`;
+    const rdMes = MONTHS[parseInt(rdParts[1])-1] + ' ' + rdParts[0];
+    reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', `Reembolso estimado em ${rdMes}`];
+  }
+
   showToast('Salvando...');
   try {
     if (editingRow) {
@@ -1020,6 +1098,7 @@ async function submitTx() {
     } else {
       await appendRow('Lancamentos', row);
       if (ccRow) await appendRow('CartaoC6', ccRow);
+      if (reimbRow) await appendRow('Reembolsos', reimbRow);
       showToast('Lançamento salvo! ✓');
     }
     await loadAll();
