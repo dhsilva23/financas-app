@@ -378,15 +378,16 @@ function fmt(v) {
 }
 function parseVal(v) {
   if (!v && v !== 0) return 0;
+  if (typeof v === 'number') return v;
   let s = String(v).replace('R$','').trim();
-  // Brazilian: "1.234,56" → has both dot and comma
+  // Brazilian thousands+decimal: "1.234,56"
   if (s.includes(',') && s.includes('.')) {
     s = s.replace(/\./g,'').replace(',','.');
-  } else if (s.includes(',')) {
-    // "956,13" → just replace comma
+  } else if (s.includes(',') && !s.includes('.')) {
+    // "956,13" → decimal comma only
     s = s.replace(',','.');
   }
-  // else already decimal like "956.13"
+  // "956.13" → already correct decimal, parseFloat handles it
   return parseFloat(s) || 0;
 }
 function showToast(msg) {
@@ -443,7 +444,7 @@ function goTo(s) {
   document.getElementById('screens').scrollTop = 0;
   if (s === 'add' && !editingRow) resetAddForm();
   if (s === 'home') renderHome();
-  if (s === 'cc') renderCC();
+  if (s === 'cc') buildCCTabs();
   if (s === 'swile') renderSwile();
   if (s === 'reimb') renderReimb();
   if (s === 'cats') renderCats();
@@ -500,11 +501,14 @@ async function loadAll() {
       getRange('Metas!A3:C10')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
+    // Only render currently visible screen
+    const activeScreen = document.querySelector('.screen.active');
+    const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
     renderHome();
-    buildCCTabs();
     renderReimb();
-    renderPoup();
     renderHealth();
+    if (activeId === 'cc') { buildCCTabs(); }
+    if (activeId === 'poup') { renderPoup(); }
   } catch(e) {
     console.error(e);
     showToast('Erro ao carregar dados. Verifique conexão.');
@@ -621,11 +625,12 @@ function openTxModal(idx, sheet) {
 }
 function closeModal() {
   document.getElementById('action-modal').classList.remove('open');
-  selectedTx = null;
+  // Don't null selectedTx here - editTx/deleteTx need it after close
 }
 function editTx() {
-  closeModal();
   const {idx, sheet} = selectedTx || {};
+  closeModal();
+  selectedTx = null;
   const r = sheet === 'Lançamentos' ? txData[idx] : ccData[idx];
   editingRow = idx + 2; // +2 for header row and 1-based
   editingSheet = sheet;
@@ -634,7 +639,10 @@ function editTx() {
   document.getElementById('submit-btn').textContent = '✓ Salvar alterações';
   // Prefill
   setType(r[1]==='Receita'?'inc':'exp');
-  document.getElementById('inp-val').value = parseVal(r[4]);
+  // Format value for Brazilian mask display
+  const numVal = parseVal(r[4]);
+  const formatted = numVal.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('inp-val').value = formatted;
   document.getElementById('inp-desc').value = r[2]||'';
   document.getElementById('inp-cat').value = r[3]||'Outros';
   document.getElementById('inp-date').value = parseDate(r[0]);
@@ -664,9 +672,11 @@ async function deleteTxDirect() {
   goTo('home');
 }
 async function deleteTx() {
+  const saved = selectedTx;
   closeModal();
-  if (!selectedTx) return;
-  const {idx, sheet} = selectedTx;
+  selectedTx = null;
+  if (!saved) return;
+  const {idx, sheet} = saved;
   if (!confirm('Excluir este lançamento?')) return;
   showToast('Excluindo...');
   await clearRow(sheet, idx + 2);
@@ -888,8 +898,10 @@ function renderPoup() {
   // Chart
   const labels = valid.map(r=>r[0].split(' ')[0]+' '+r[0].split(' ')[1]?.slice(2));
   const vals = valid.map(r=>parseVal(r[1]));
+  const canvas = document.getElementById('poupChart');
+  if (!canvas) return;
   if (poupChart) poupChart.destroy();
-  poupChart = new Chart(document.getElementById('poupChart'), {
+  poupChart = new Chart(canvas, {
     type:'line',
     data:{
       labels,
@@ -959,7 +971,8 @@ function selPay(m, el) {
 }
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
-  const val = parseVal(document.getElementById('inp-val').value).toFixed(2);
+  const rawVal = parseVal(document.getElementById('inp-val').value);
+  const val = rawVal; // send as number, not string
   const desc = document.getElementById('inp-desc').value;
   const cat = txType==='exp' ? document.getElementById('inp-cat').value : '';
   const rawDate = document.getElementById('inp-date').value;
@@ -968,15 +981,15 @@ async function submitTx() {
   const isProj = new Date(rawDate) > new Date() ? 'Sim' : 'Não';
   const obs = document.getElementById('inp-obs').value;
   const ml = MONTHS[parseInt(dateParts[1])-1] + ' ' + dateParts[0];
-  const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, val, payMethod, isProj, ml, obs];
+  const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payMethod, isProj, ml, obs];
   
   // If CC, also add to Cartão C6 sheet
   let ccRow = null;
   if (payMethod === 'Cartão C6') {
     const fatura = document.getElementById('inp-fatura').value;
     const parc = parseInt(document.getElementById('inp-parc').value) || 1;
-    const parcVal = (parseFloat(val)/parc).toFixed(2);
-    ccRow = [dateFormatted, desc, cat, val, parc, parcVal, fatura, isProj==='Sim'?'Projeção':'Em aberto', obs];
+    const parcVal = rawVal / parc;
+    ccRow = [dateFormatted, desc, cat, rawVal, parc, parcVal, fatura, isProj==='Sim'?'Projeção':'Em aberto', obs];
   }
 
   showToast('Salvando...');
