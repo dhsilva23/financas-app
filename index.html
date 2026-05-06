@@ -379,24 +379,30 @@ function fmt(v) {
 function parseVal(v) {
   if (!v && v !== 0) return 0;
   if (typeof v === 'number') return v;
-  let s = String(v).replace('R$','').trim();
-  // Brazilian format with thousands separator: "1.234,56"
-  if (s.includes(',') && s.includes('.')) {
-    // dots are thousands separators, comma is decimal
-    s = s.replace(/\./g,'').replace(',','.');
-  } else if (s.includes(',')) {
-    // Only comma: could be "956,13" (decimal) or "1,234" (thousands, no decimal)
-    const parts = s.split(',');
-    if (parts[1] && parts[1].length <= 2) {
-      // "956,13" → 2 decimal digits → it's a decimal separator
-      s = s.replace(',','.');
-    } else {
-      // "1,234" → more than 2 digits after comma → thousands separator, no decimal
-      s = s.replace(/,/g,'');
-    }
+  let s = String(v).replace(/R\$\s*/g,'').trim();
+  if (!s) return 0;
+  // Detect format by counting separators
+  const dots = (s.match(/\./g)||[]).length;
+  const commas = (s.match(/,/g)||[]).length;
+  if (dots === 0 && commas === 0) return parseFloat(s) || 0;
+  // "1.234,56" or "1.234.567,89" — dot=thousands, comma=decimal
+  if (commas === 1 && s.indexOf(',') > s.lastIndexOf('.')) {
+    return parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
   }
-  // already decimal dot: "956.13"
-  return parseFloat(s) || 0;
+  // "1,234.56" — comma=thousands, dot=decimal (US format from Sheets)
+  if (dots === 1 && s.indexOf('.') > s.lastIndexOf(',')) {
+    return parseFloat(s.replace(/,/g,'')) || 0;
+  }
+  // "956,13" — single comma, no dot, treat as decimal
+  if (commas === 1 && dots === 0) {
+    return parseFloat(s.replace(',','.')) || 0;
+  }
+  // "956.13" — single dot, no comma
+  if (dots === 1 && commas === 0) {
+    return parseFloat(s) || 0;
+  }
+  // fallback: remove all non-numeric except last separator
+  return parseFloat(s.replace(/[^0-9.]/g,'')) || 0;
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
