@@ -296,7 +296,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
             <button class="popt" onclick="selPay('Transferência',this)"><i class="ti ti-building-bank"></i><br>Transferência</button>
             <button class="popt" onclick="selPay('Débito',this)"><i class="ti ti-credit-card"></i><br>Débito</button>
             <button class="popt" onclick="selPay('Boleto (débito em conta)',this)"><i class="ti ti-file-invoice"></i><br>Boleto<br><span style="font-size:9px;">(déb. conta)</span></button>
-            <button class="popt" onclick="selPay('Cartão C6',this)"><i class="ti ti-brand-mastercard"></i><br>Cartão C6</button>
+            <button class="popt" onclick="selPay('CartaoC6',this)"><i class="ti ti-brand-mastercard"></i><br>Cartão C6</button>
             <button class="popt" onclick="selPay('Swile',this)"><i class="ti ti-leaf"></i><br>Swile</button>
             <button class="popt" onclick="selPay('Dinheiro',this)"><i class="ti ti-cash"></i><br>Dinheiro</button>
           </div>
@@ -473,10 +473,8 @@ function changeMonthCat(d) {
 // ── SHEETS API ───────────────────────────────────────────
 async function getRange(range) {
   const url = `${BASE}/values/${encodeURIComponent(range)}?key=${API_KEY}`;
-  console.log('Fetching:', range, '→', url.substring(0,80));
   const r = await fetch(url);
   const d = await r.json();
-  console.log('Response for', range, ':', d.values ? d.values.length + ' rows' : JSON.stringify(d).substring(0,100));
   return d.values || [];
 }
 async function scriptPost(payload) {
@@ -503,21 +501,15 @@ async function clearRow(sheet, rowNum) {
 async function loadAll() {
   try {
     const [tx, cc, sw, rb, pp, mt] = await Promise.all([
-      getRange('Lançamentos!A2:I500'),
-      getRange('Cartão C6!A2:I500'),
+      getRange('Lancamentos!A2:I500'),
+      getRange('CartaoC6!A2:I500'),
       getRange('Swile!A2:H200'),
       getRange('Reembolsos!A2:H200'),
-      getRange('Poupança!A2:F50'),
+      getRange('Poupanca!A2:F50'),
       getRange('Metas!A3:C10')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
-    console.log('=== TX rows:', txData.length, '| CC rows:', ccData.length, '| Poup rows:', poupData.length);
-    if (txData.length > 0) {
-      console.log('TX[0]:', JSON.stringify(txData[0]));
-      console.log('val raw:', txData[0][4], '| type:', typeof txData[0][4], '| parsed:', parseVal(txData[0][4]));
-    } else {
-      console.log('txData is EMPTY — checking sheet name encoding...');
-    }
+
     // Only render currently visible screen
     const activeScreen = document.querySelector('.screen.active');
     const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
@@ -585,7 +577,7 @@ function renderHome() {
   // Recent transactions
   const recent = [...monthTx].reverse().slice(0,8);
   document.getElementById('home-txs').innerHTML = recent.length
-    ? recent.map((r,i) => txRow(r, txData.indexOf(r), 'Lançamentos')).join('')
+    ? recent.map((r,i) => txRow(r, txData.indexOf(r), 'Lancamentos')).join('')
     : '<div class="empty">Nenhum lançamento este mês</div>';
 }
 
@@ -635,7 +627,7 @@ function txRow(r, idx, sheet) {
 // ── MODAL ────────────────────────────────────────────────
 function openTxModal(idx, sheet) {
   selectedTx = {idx, sheet};
-  const r = sheet === 'Lançamentos' ? txData[idx] : ccData[idx];
+  const r = sheet === 'Lancamentos' ? txData[idx] : ccData[idx];
   document.getElementById('modal-title').textContent = r[2] || 'Lançamento';
   document.getElementById('modal-sub').textContent = `${fmt(r[4])} · ${r[0]||''} · ${r[3]||r[1]||''}`;
   document.getElementById('action-modal').classList.add('open');
@@ -648,7 +640,7 @@ function editTx() {
   const {idx, sheet} = selectedTx || {};
   closeModal();
   selectedTx = null;
-  const r = sheet === 'Lançamentos' ? txData[idx] : ccData[idx];
+  const r = sheet === 'Lancamentos' ? txData[idx] : ccData[idx];
   editingRow = idx + 2; // +2 for header row and 1-based
   editingSheet = sheet;
   document.getElementById('add-title').textContent = 'Editar Lançamento';
@@ -740,7 +732,7 @@ function setCCMonthRender(m) {
   document.getElementById('cc-txs').innerHTML = rows.length
     ? rows.map((r,i)=>{
         const realIdx = ccData.indexOf(r);
-        return `<div class="tx" onclick="openTxModal(${realIdx},'Cartão C6')">
+        return `<div class="tx" onclick="openTxModal(${realIdx},'CartaoC6')">
           <div class="tx-ico" style="background:${(r[7]==='Pago')?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7'};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
           <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}</div></div>
           <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
@@ -984,7 +976,7 @@ function selPay(m, el) {
   payMethod = m;
   el.closest('.popts').querySelectorAll('.popt').forEach(p=>p.classList.remove('sel'));
   el.classList.add('sel');
-  document.getElementById('cc-fatura-sec').style.display = m==='Cartão C6'?'block':'none';
+  document.getElementById('cc-fatura-sec').style.display = m==='CartaoC6'?'block':'none';
 }
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
@@ -1002,7 +994,7 @@ async function submitTx() {
   
   // If CC, also add to Cartão C6 sheet
   let ccRow = null;
-  if (payMethod === 'Cartão C6') {
+  if (payMethod === 'CartaoC6') {
     const fatura = document.getElementById('inp-fatura').value;
     const parc = parseInt(document.getElementById('inp-parc').value) || 1;
     const parcVal = rawVal / parc;
@@ -1012,11 +1004,11 @@ async function submitTx() {
   showToast('Salvando...');
   try {
     if (editingRow) {
-      await updateRow(editingSheet || 'Lançamentos', editingRow, row);
+      await updateRow(editingSheet || 'Lancamentos', editingRow, row);
       showToast('Lançamento atualizado! ✓');
     } else {
-      await appendRow('Lançamentos', row);
-      if (ccRow) await appendRow('Cartão C6', ccRow);
+      await appendRow('Lancamentos', row);
+      if (ccRow) await appendRow('CartaoC6', ccRow);
       showToast('Lançamento salvo! ✓');
     }
     await loadAll();
