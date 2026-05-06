@@ -380,14 +380,22 @@ function parseVal(v) {
   if (!v && v !== 0) return 0;
   if (typeof v === 'number') return v;
   let s = String(v).replace('R$','').trim();
-  // Brazilian thousands+decimal: "1.234,56"
+  // Brazilian format with thousands separator: "1.234,56"
   if (s.includes(',') && s.includes('.')) {
+    // dots are thousands separators, comma is decimal
     s = s.replace(/\./g,'').replace(',','.');
-  } else if (s.includes(',') && !s.includes('.')) {
-    // "956,13" → decimal comma only
-    s = s.replace(',','.');
+  } else if (s.includes(',')) {
+    // Only comma: could be "956,13" (decimal) or "1,234" (thousands, no decimal)
+    const parts = s.split(',');
+    if (parts[1] && parts[1].length <= 2) {
+      // "956,13" → 2 decimal digits → it's a decimal separator
+      s = s.replace(',','.');
+    } else {
+      // "1,234" → more than 2 digits after comma → thousands separator, no decimal
+      s = s.replace(/,/g,'');
+    }
   }
-  // "956.13" → already correct decimal, parseFloat handles it
+  // already decimal dot: "956.13"
   return parseFloat(s) || 0;
 }
 function showToast(msg) {
