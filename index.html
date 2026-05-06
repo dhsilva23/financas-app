@@ -372,8 +372,8 @@ let poupChart = null;
 // ── UTILS ────────────────────────────────────────────────
 function fmt(v) {
   if (v === '' || v === null || v === undefined) return '—';
-  const n = parseFloat(String(v).replace(',','.').replace('R$','').replace(/\./g,'').replace(',','.'));
-  if (isNaN(n)) return v;
+  const n = parseVal(v);
+  if (isNaN(n)) return String(v);
   return 'R$' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function parseVal(v) {
@@ -438,8 +438,11 @@ function calcSaldoInicial() {
   txData.forEach(r => {
     const ml = r[7]||'';
     if (!ml) return;
-    const parts = ml.split(' ');
-    const key = parseInt(parts[1])*12 + MONTHS.indexOf(parts[0]);
+    const mlNorm = ml.charAt(0).toUpperCase() + ml.slice(1).toLowerCase();
+    const parts = mlNorm.split(' ');
+    const monthIdx = MONTHS.indexOf(parts[0]);
+    if (monthIdx === -1 || !parts[1]) return;
+    const key = parseInt(parts[1])*12 + monthIdx;
     if (key < curKey && r[6] !== 'Sim') {
       if (r[1]==='Receita') saldoAnterior += parseVal(r[4]);
       else if (r[1]==='Gasto') saldoAnterior -= parseVal(r[4]);
@@ -516,15 +519,7 @@ async function loadAll() {
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
 
-    // DEBUG
-    console.log('TX count:', txData.length);
-    if(txData.length > 0) {
-      const r = txData[0];
-      console.log('First row:', JSON.stringify(r));
-      console.log('Col4 raw:', r[4], '| typeof:', typeof r[4]);
-      console.log('Col7 (mes):', r[7]);
-      console.log('parseVal result:', parseVal(r[4]));
-    }
+
     // Only render currently visible screen
     const activeScreen = document.querySelector('.screen.active');
     const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
@@ -542,7 +537,8 @@ async function loadAll() {
 // ── HOME ─────────────────────────────────────────────────
 function renderHome() {
   const ml = curMonthLabel();
-  const monthTx = txData.filter(r => (r[7]||'') === ml);
+  const ml_lower = ml.toLowerCase();
+  const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
   const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const saldoInicial = calcSaldoInicial();
