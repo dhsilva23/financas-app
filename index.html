@@ -272,7 +272,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           <button class="tbtn" id="btn-inc" onclick="setType('inc')">↓ Receita</button>
         </div>
         <div class="step active" id="step1">
-          <div class="fg"><label>Valor (R$)</label><input type="number" step="0.01" placeholder="0,00" id="inp-val" style="font-size:22px;font-weight:600;"></div>
+          <div class="fg"><label>Valor (R$)</label><input type="text" inputmode="decimal" placeholder="0,00" id="inp-val" style="font-size:22px;font-weight:600;" oninput="maskCurrency(this)"></div>
           <div class="fg"><label>Descrição</label><input type="text" placeholder="Ex: Salão, Mercado, Hotel..." id="inp-desc"></div>
           <div class="fg" id="fg-cat"><label>Categoria</label>
             <select id="inp-cat">
@@ -377,8 +377,17 @@ function fmt(v) {
   return 'R$' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function parseVal(v) {
-  if (!v) return 0;
-  return parseFloat(String(v).replace('R$','').replace(/\./g,'').replace(',','.')) || 0;
+  if (!v && v !== 0) return 0;
+  let s = String(v).replace('R$','').trim();
+  // Brazilian: "1.234,56" → has both dot and comma
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g,'').replace(',','.');
+  } else if (s.includes(',')) {
+    // "956,13" → just replace comma
+    s = s.replace(',','.');
+  }
+  // else already decimal like "956.13"
+  return parseFloat(s) || 0;
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -387,6 +396,42 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function curMonthLabel() { return MONTHS[curM] + ' ' + curY; }
+
+// Currency mask: keeps Brazilian format while typing
+function maskCurrency(el) {
+  let v = el.value.replace(/\D/g,'');
+  if (!v) { el.value = ''; return; }
+  v = (parseInt(v,10)/100).toFixed(2);
+  el.value = v.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+}
+
+// Saldo carryover: sum all previous months
+function calcSaldoInicial() {
+  // Get all months before current in order
+  const allMonths = [];
+  const monthsOrder = {};
+  txData.forEach(r => {
+    const ml = r[7]||'';
+    if (ml && !monthsOrder[ml]) {
+      const parts = ml.split(' ');
+      monthsOrder[ml] = parseInt(parts[1])*12 + MONTHS.indexOf(parts[0]);
+    }
+  });
+  const curKey = curY*12 + curM;
+  let saldoAnterior = 0;
+  // Sum all realized tx in months before current
+  txData.forEach(r => {
+    const ml = r[7]||'';
+    if (!ml) return;
+    const parts = ml.split(' ');
+    const key = parseInt(parts[1])*12 + MONTHS.indexOf(parts[0]);
+    if (key < curKey && r[6] !== 'Sim') {
+      if (r[1]==='Receita') saldoAnterior += parseVal(r[4]);
+      else if (r[1]==='Gasto') saldoAnterior -= parseVal(r[4]);
+    }
+  });
+  return saldoAnterior;
+}
 function catMonthLabel() { return MONTHS[catM] + ' ' + catY; }
 
 // ── NAVIGATION ───────────────────────────────────────────
@@ -423,29 +468,24 @@ async function getRange(range) {
   const d = await r.json();
   return d.values || [];
 }
-async function appendRow(sheet, values) {
-  await fetch(SCRIPT_URL, {
+async function scriptPost(payload) {
+  // Apps Script requires no-cors but we wait 1.5s for it to complete
+  fetch(SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({action:'append', sheet, values})
+    body: JSON.stringify(payload)
   });
+  await new Promise(r => setTimeout(r, 1500));
+}
+async function appendRow(sheet, values) {
+  await scriptPost({action:'append', sheet, values});
 }
 async function updateRow(sheet, rowNum, values) {
-  await fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({action:'update', sheet, row:rowNum, values})
-  });
+  await scriptPost({action:'update', sheet, row:rowNum, values});
 }
 async function clearRow(sheet, rowNum) {
-  await fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({action:'clear', sheet, row:rowNum})
-  });
+  await scriptPost({action:'clear', sheet, row:rowNum});
 }
 
 // ── LOAD DATA ────────────────────────────────────────────
@@ -475,18 +515,21 @@ async function loadAll() {
 function renderHome() {
   const ml = curMonthLabel();
   const monthTx = txData.filter(r => (r[7]||'') === ml);
-  const receitas = monthTx.filter(r => r[1]==='Receita').reduce((s,r)=>s+parseVal(r[4]),0);
+  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
-  const saldo = receitas - gastos;
+  const saldoInicial = calcSaldoInicial();
+  const saldo = saldoInicial + receitas - gastos;
   const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const projGasto = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
 
   // CC fatura do mês
   const ccFatura = ccData.filter(r=>(r[6]||'')===ml).reduce((s,r)=>s+parseVal(r[3]),0);
 
+  const saldoColor = saldo >= 0 ? 'pos' : 'neg';
   document.getElementById('home-saldo-card').innerHTML = `
-    <div class="row"><span class="lbl">Saldo bancário</span><span class="val big pos">${fmt(saldo)}</span></div>
+    <div class="row"><span class="lbl">Saldo atual</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
     <hr class="div">
+    <div class="row"><span class="lbl">Saldo inicial do mês</span><span class="val">${fmt(saldoInicial)}</span></div>
     <div class="row"><span class="lbl">↓ Receitas realizadas</span><span class="val pos">+${fmt(receitas)}</span></div>
     <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
@@ -916,7 +959,7 @@ function selPay(m, el) {
 }
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
-  const val = parseFloat(document.getElementById('inp-val').value).toFixed(2);
+  const val = parseVal(document.getElementById('inp-val').value).toFixed(2);
   const desc = document.getElementById('inp-desc').value;
   const cat = txType==='exp' ? document.getElementById('inp-cat').value : '';
   const rawDate = document.getElementById('inp-date').value;
