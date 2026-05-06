@@ -473,8 +473,10 @@ function changeMonthCat(d) {
 // ── SHEETS API ───────────────────────────────────────────
 async function getRange(range) {
   const url = `${BASE}/values/${encodeURIComponent(range)}?key=${API_KEY}`;
+  console.log('Fetching:', range, '→', url.substring(0,80));
   const r = await fetch(url);
   const d = await r.json();
+  console.log('Response for', range, ':', d.values ? d.values.length + ' rows' : JSON.stringify(d).substring(0,100));
   return d.values || [];
 }
 async function scriptPost(payload) {
@@ -509,11 +511,13 @@ async function loadAll() {
       getRange('Metas!A3:C10')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
-    // DEBUG: log first few tx rows to console
-    console.log('=== RAW TX DATA (first 3 rows) ===');
-    txData.slice(0,3).forEach((r,i) => console.log(i, JSON.stringify(r)));
-    console.log('=== PARSED VALUES ===');
-    txData.slice(0,3).forEach((r,i) => console.log(i, 'val raw:', r[4], '| type:', typeof r[4], '| parsed:', parseVal(r[4]), '| mes:', r[7], '| proj:', r[6]));
+    console.log('=== TX rows:', txData.length, '| CC rows:', ccData.length, '| Poup rows:', poupData.length);
+    if (txData.length > 0) {
+      console.log('TX[0]:', JSON.stringify(txData[0]));
+      console.log('val raw:', txData[0][4], '| type:', typeof txData[0][4], '| parsed:', parseVal(txData[0][4]));
+    } else {
+      console.log('txData is EMPTY — checking sheet name encoding...');
+    }
     // Only render currently visible screen
     const activeScreen = document.querySelector('.screen.active');
     const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
