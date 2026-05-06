@@ -516,6 +516,15 @@ async function loadAll() {
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
 
+    // DEBUG
+    console.log('TX count:', txData.length);
+    if(txData.length > 0) {
+      const r = txData[0];
+      console.log('First row:', JSON.stringify(r));
+      console.log('Col4 raw:', r[4], '| typeof:', typeof r[4]);
+      console.log('Col7 (mes):', r[7]);
+      console.log('parseVal result:', parseVal(r[4]));
+    }
     // Only render currently visible screen
     const activeScreen = document.querySelector('.screen.active');
     const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
