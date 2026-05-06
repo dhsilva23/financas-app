@@ -357,6 +357,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
 const API_KEY = 'AIzaSyDe_Rfyq76rRJ41OGfYad4qGNwcIBPlt0M';
 const SHEET_ID = '1WeHnxut9Mp1e6hG-oN_xoYneUzPSCLOZAzex857t5go';
 const BASE = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}`;
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyFgaTu-X51Qb2LEc3W5ZHu2VtuOgfZquT6UuGtZbODeA-9ItvtDNWvUAUI761DvEno/exec';
 
 // ── STATE ────────────────────────────────────────────────
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -423,27 +424,28 @@ async function getRange(range) {
   return d.values || [];
 }
 async function appendRow(sheet, values) {
-  const url = `${BASE}/values/${encodeURIComponent(sheet + '!A:Z')}:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-  const r = await fetch(url, {
+  await fetch(SCRIPT_URL, {
     method: 'POST',
+    mode: 'no-cors',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({values: [values]})
+    body: JSON.stringify({action:'append', sheet, values})
   });
-  return r.json();
 }
 async function updateRow(sheet, rowNum, values) {
-  const url = `${BASE}/values/${encodeURIComponent(sheet + '!A' + rowNum + ':Z' + rowNum)}?valueInputOption=USER_ENTERED&key=${API_KEY}`;
-  const r = await fetch(url, {
-    method: 'PUT',
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({values: [values]})
+    body: JSON.stringify({action:'update', sheet, row:rowNum, values})
   });
-  return r.json();
 }
 async function clearRow(sheet, rowNum) {
-  const url = `${BASE}/values/${encodeURIComponent(sheet + '!A' + rowNum + ':Z' + rowNum)}:clear?key=${API_KEY}`;
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}});
-  return r.json();
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action:'clear', sheet, row:rowNum})
+  });
 }
 
 // ── LOAD DATA ────────────────────────────────────────────
