@@ -509,6 +509,11 @@ async function loadAll() {
       getRange('Metas!A3:C10')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
+    // DEBUG: log first few tx rows to console
+    console.log('=== RAW TX DATA (first 3 rows) ===');
+    txData.slice(0,3).forEach((r,i) => console.log(i, JSON.stringify(r)));
+    console.log('=== PARSED VALUES ===');
+    txData.slice(0,3).forEach((r,i) => console.log(i, 'val raw:', r[4], '| type:', typeof r[4], '| parsed:', parseVal(r[4]), '| mes:', r[7], '| proj:', r[6]));
     // Only render currently visible screen
     const activeScreen = document.querySelector('.screen.active');
     const activeId = activeScreen ? activeScreen.id.replace('screen-','') : 'home';
