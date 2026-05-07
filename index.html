@@ -299,15 +299,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
               <option>Transporte</option><option>Saúde</option><option>Beleza & Cuidados</option>
               <option>Moda & Acessórios</option><option>Lazer</option><option>Viagens (pessoal)</option>
               <option>Assinaturas</option><option>Jimmy</option><option>Dízimo/Doações</option>
-              <option>Despesa Reembolsável</option><option>Investimentos/Poupança</option><option>Outros</option>
+              <option>Despesa Reembolsável</option>
+              <option>A Receber (Pessoa)</option><option>Investimentos/Poupança</option><option>Outros</option>
             </select>
           </div>
           <div class="fg"><label>Data <span style="font-size:10px;color:var(--text3);">(futura = projeção automática)</span></label><input type="date" id="inp-date"></div>
           <div class="fg"><label>Observação (opcional)</label><input type="text" id="inp-obs" placeholder="Ex: parcela 1/3, reembolso pendente..."></div>
-          <div class="fg" id="fg-reimb-date" style="display:none;">
-            <label>Data estimada do reembolso</label>
-            <input type="date" id="inp-reimb-date">
-            <div style="font-size:10px;color:var(--text3);margin-top:4px;">O valor será adicionado como receita projetada neste mês</div>
+          <div id="fg-reimb-fields" style="display:none;">
+            <div class="fg">
+              <label id="lbl-reimb-date">Data estimada do reembolso</label>
+              <input type="date" id="inp-reimb-date">
+              <div style="font-size:10px;color:var(--text3);margin-top:4px;">O valor entrará como receita projetada neste mês</div>
+            </div>
+            <div class="fg" id="fg-pessoa-nome" style="display:none;">
+              <label>Nome da pessoa</label>
+              <input type="text" id="inp-pessoa-nome" placeholder="Ex: João, Maria...">
+            </div>
           </div>
           <button class="sbtn" onclick="goStep2()">Continuar →</button>
           <button class="bbtn" id="delete-btn" style="display:none;color:var(--red);" onclick="confirmDelete()">🗑 Excluir lançamento</button>
@@ -622,14 +629,16 @@ const catColors = {
   'Transporte':'#D85A30','Saúde':'#1D9E75','Beleza & Cuidados':'#C2185B',
   'Moda & Acessórios':'#E67E22','Lazer':'#7F77DD','Viagens (pessoal)':'#00ACC1',
   'Assinaturas':'#7F77DD','Jimmy':'#639922','Dízimo/Doações':'#888780',
-  'Despesa Reembolsável':'#8A5800','Investimentos/Poupança':'#1D9E75','Outros':'#888780'
+  'Despesa Reembolsável':'#8A5800','A Receber (Pessoa)':'#3B5BDB',
+  'Investimentos/Poupança':'#1D9E75','Outros':'#888780'
 };
 const catIcons = {
   'Moradia':'home','Casa & Decoração':'sofa','Alimentação':'tools-kitchen-2',
   'Transporte':'car','Saúde':'heart','Beleza & Cuidados':'sparkles',
   'Moda & Acessórios':'hanger','Lazer':'ticket','Viagens (pessoal)':'plane',
   'Assinaturas':'music','Jimmy':'paw','Dízimo/Doações':'hand-heart',
-  'Despesa Reembolsável':'briefcase','Investimentos/Poupança':'trending-up','Outros':'dots'
+  'Despesa Reembolsável':'briefcase','A Receber (Pessoa)':'user',
+  'Investimentos/Poupança':'trending-up','Outros':'dots'
 };
 
 function txRow(r, idx, sheet) {
@@ -824,29 +833,51 @@ function renderSwile() {
 function renderReimb() {
   const pendentes = reimbData.filter(r=>(r[4]||'')==='Pendente');
   const recebidos = reimbData.filter(r=>(r[4]||'')==='Recebido');
-  const totalPend = pendentes.reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalEmpresa = pendentes.filter(r=>(r[8]||'Empresa')==='Empresa').reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPessoa = pendentes.filter(r=>(r[8]||'')==='Pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPend = totalEmpresa + totalPessoa;
   document.getElementById('reimb-total').innerHTML = `
     <div class="row"><span class="lbl" style="color:#8A5800;">Total em aberto</span><span class="val big warn">${fmt(totalPend)}</span></div>
-    <div style="font-size:11px;color:#8A5800;margin-top:2px;">${pendentes.length} despesa(s) aguardando reembolso</div>
+    <div style="display:flex;gap:16px;margin-top:6px;">
+      <div style="font-size:11px;color:#8A5800;">🏢 Empresa: ${fmt(totalEmpresa)}</div>
+      <div style="font-size:11px;color:#3B5BDB;">👤 Pessoas: ${fmt(totalPessoa)}</div>
+    </div>
   `;
   document.getElementById('reimb-open').innerHTML = pendentes.length
     ? pendentes.map((r,i)=>{
         const realIdx = reimbData.indexOf(r);
+        const isPessoa = (r[8]||'') === 'Pessoa';
+        const nome = r[9] || '';
+        const tag = isPessoa
+          ? `<span class="chip" style="background:#EEF2FF;color:#3B5BDB;">👤 ${nome||'Pessoa'}</span>`
+          : `<span class="chip chip-r">🏢 Empresa</span>`;
         return `<div class="tx">
-          <div class="tx-ico" style="background:var(--yellow-l);"><i class="ti ti-briefcase" style="color:#8A5800;"></i></div>
-          <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[3]||''} · ${r[0]||''}</div></div>
+          <div class="tx-ico" style="background:var(--yellow-l);"><i class="ti ti-${isPessoa?'user':'briefcase'}" style="color:#8A5800;"></i></div>
+          <div class="tx-info">
+            <div class="tx-desc">${r[1]||''}${tag}</div>
+            <div class="tx-meta">${r[3]||''} · ${r[0]||''} · Est. ${r[5]||'—'}</div>
+          </div>
           <div class="tx-r">
             <div class="tx-amt rmb">${fmt(r[2])}</div>
             <button onclick="markReimbReceived(${realIdx})" style="font-size:10px;color:var(--green);background:none;border:0.5px solid var(--green);border-radius:12px;padding:3px 8px;cursor:pointer;margin-top:3px;">✓ Recebido</button>
           </div>
         </div>`;
       }).join('')
-    : '<div class="empty">Nenhum reembolso pendente 🎉</div>';
-  document.getElementById('reimb-done').innerHTML = recebidos.map(r=>`<div class="tx">
-    <div class="tx-ico" style="background:var(--green-l);"><i class="ti ti-check" style="color:var(--green-d);"></i></div>
-    <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">Recebido em ${r[5]||''}</div></div>
-    <div class="tx-r"><div class="tx-amt inc">+${fmt(r[6]||r[2])}</div></div>
-  </div>`).join('');
+    : '<div class="empty">Nada pendente 🎉</div>';
+  document.getElementById('reimb-done').innerHTML = recebidos.length
+    ? recebidos.map(r=>{
+        const isPessoa = (r[8]||'') === 'Pessoa';
+        const nome = r[9] || '';
+        return `<div class="tx">
+          <div class="tx-ico" style="background:var(--green-l);"><i class="ti ti-check" style="color:var(--green-d);"></i></div>
+          <div class="tx-info">
+            <div class="tx-desc">${r[1]||''} ${isPessoa?`<span class="chip" style="background:#EEF2FF;color:#3B5BDB;">👤 ${nome}</span>`:`<span class="chip chip-s">🏢</span>`}</div>
+            <div class="tx-meta">Recebido em ${r[5]||''}</div>
+          </div>
+          <div class="tx-r"><div class="tx-amt inc">+${fmt(r[6]||r[2])}</div></div>
+        </div>`;
+      }).join('')
+    : '<div class="empty">Nenhum recebimento ainda</div>';
 }
 async function markReimbReceived(idx) {
   const r = [...reimbData[idx]];
@@ -1030,8 +1061,13 @@ function setType(t) {
 function checkReimbField() {
   const cat = document.getElementById('inp-cat').value;
   const isReimb = cat === 'Despesa Reembolsável';
-  const el = document.getElementById('fg-reimb-date');
-  if (el) el.style.display = isReimb ? 'block' : 'none';
+  const isPessoa = cat === 'A Receber (Pessoa)';
+  const fields = document.getElementById('fg-reimb-fields');
+  const pessoaNome = document.getElementById('fg-pessoa-nome');
+  const lbl = document.getElementById('lbl-reimb-date');
+  if (fields) fields.style.display = (isReimb || isPessoa) ? 'block' : 'none';
+  if (pessoaNome) pessoaNome.style.display = isPessoa ? 'block' : 'none';
+  if (lbl) lbl.textContent = isPessoa ? 'Data estimada de recebimento' : 'Data estimada do reembolso';
 }
 function goStep1() {
   document.getElementById('step1').classList.add('active');
@@ -1080,14 +1116,21 @@ async function submitTx() {
     ccRow = [dateFormatted, desc, cat, rawVal, parc, parcVal, fatura, isProj==='Sim'?'Projeção':'Em aberto', obs];
   }
 
-  // Reembolso date
+  // Reembolso / A Receber
   const reimbDate = document.getElementById('inp-reimb-date')?.value;
+  const pessoaNome = document.getElementById('inp-pessoa-nome')?.value || '';
   let reimbRow = null;
-  if (cat === 'Despesa Reembolsável' && reimbDate) {
+  const isReimbCat = cat === 'Despesa Reembolsável';
+  const isPessoaCat = cat === 'A Receber (Pessoa)';
+  if ((isReimbCat || isPessoaCat) && reimbDate) {
     const rdParts = reimbDate.split('-');
     const rdFormatted = `${rdParts[2]}/${rdParts[1]}/${rdParts[0]}`;
     const rdMes = MONTHS[parseInt(rdParts[1])-1] + ' ' + rdParts[0];
-    reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', `Reembolso estimado em ${rdMes}`];
+    const tipo = isPessoaCat ? 'Pessoa' : 'Empresa';
+    const obs = isPessoaCat && pessoaNome
+      ? `A receber de ${pessoaNome} — estimado em ${rdMes}`
+      : `Reembolso estimado em ${rdMes}`;
+    reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', obs, tipo, pessoaNome];
   }
 
   showToast('Salvando...');
