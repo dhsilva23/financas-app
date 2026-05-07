@@ -185,7 +185,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <div class="txl" id="cc-txs"><div class="loading"><div class="spinner"></div></div></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
           <button onclick="goTo('add')" style="padding:11px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:none;color:var(--green);font-size:13px;cursor:pointer;"><i class="ti ti-plus"></i> Lançar no cartão</button>
-          <button onclick="pagarFatura()" style="padding:11px;border:none;border-radius:var(--r-md);background:var(--blue-l);color:var(--blue);font-size:13px;cursor:pointer;font-weight:500;"><i class="ti ti-wallet"></i> Pagar fatura</button>
+          <button id="cc-pagar-btn" onclick="pagarFatura()" style="padding:11px;border:none;border-radius:var(--r-md);background:var(--blue-l);color:var(--blue);font-size:13px;cursor:pointer;font-weight:500;"><i class="ti ti-wallet"></i> Pagar fatura</button>
         </div>
       </div>
     </div>
@@ -399,9 +399,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
     <h2 id="modal-title">Lançamento</h2>
     <div style="font-size:12px;color:var(--text3);margin-bottom:16px;" id="modal-sub"></div>
     <div class="action-list">
+      <button class="action-btn" id="modal-realize-btn" onclick="realizeTx()" style="display:none;background:#E1F5EE;color:#0F6E56;"><i class="ti ti-check"></i> Marcar como realizado</button>
       <button class="action-btn edit" onclick="editTx()"><i class="ti ti-pencil"></i> Editar lançamento</button>
       <button class="action-btn del" onclick="deleteTx()"><i class="ti ti-trash"></i> Excluir lançamento</button>
       <button class="action-btn cancel" onclick="closeModal()">Cancelar</button>
+    </div>
+    <!-- Quick realize form -->
+    <div id="realize-form" style="display:none;margin-top:16px;border-top:0.5px solid var(--border);padding-top:16px;">
+      <div style="font-size:13px;font-weight:500;margin-bottom:12px;">Confirmar valor realizado</div>
+      <div class="fg">
+        <label>Valor real (R$) <span style="font-size:10px;color:var(--text3);">— ajuste se diferente do projetado</span></label>
+        <input type="text" inputmode="decimal" id="realize-val" style="font-size:20px;font-weight:600;" oninput="maskCurrency(this)">
+      </div>
+      <div class="fg">
+        <label>Data de pagamento</label>
+        <input type="date" id="realize-date">
+      </div>
+      <button class="sbtn" onclick="confirmRealize()">✓ Confirmar pagamento</button>
+      <button class="bbtn" onclick="document.getElementById('realize-form').style.display='none';document.getElementById('modal-realize-btn').style.display='block';">← Voltar</button>
     </div>
   </div>
 </div>
@@ -726,11 +741,59 @@ function openTxModal(idx, sheet) {
   const r = sheet === 'Lancamentos' ? txData[idx] : ccData[idx];
   document.getElementById('modal-title').textContent = r[2] || 'Lançamento';
   document.getElementById('modal-sub').textContent = `${fmt(r[4])} · ${r[0]||''} · ${r[3]||r[1]||''}`;
+  // Show "Marcar como realizado" only for projected entries
+  const isProj = (r[6]||'').toLowerCase() === 'sim';
+  const realizeBtn = document.getElementById('modal-realize-btn');
+  const realizeForm = document.getElementById('realize-form');
+  if (realizeBtn) realizeBtn.style.display = isProj ? 'block' : 'none';
+  if (realizeForm) realizeForm.style.display = 'none';
   document.getElementById('action-modal').classList.add('open');
 }
 function closeModal() {
   document.getElementById('action-modal').classList.remove('open');
+  const realizeForm = document.getElementById('realize-form');
+  if (realizeForm) realizeForm.style.display = 'none';
   // Don't null selectedTx here - editTx/deleteTx need it after close
+}
+
+function realizeTx() {
+  // Show the quick realize form
+  document.getElementById('modal-realize-btn').style.display = 'none';
+  const form = document.getElementById('realize-form');
+  form.style.display = 'block';
+  // Pre-fill with projected value and today's date
+  const r = txData[selectedTx?.idx];
+  if (r) {
+    const valFormatted = parseVal(r[4]).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('realize-val').value = valFormatted;
+  }
+  document.getElementById('realize-date').value = new Date().toISOString().split('T')[0];
+}
+
+async function confirmRealize() {
+  if (!selectedTx) return;
+  const {idx, sheet} = selectedTx;
+  const r = txData[idx];
+  if (!r) return;
+  const realVal = parseVal(document.getElementById('realize-val').value);
+  const realDate = document.getElementById('realize-date').value;
+  if (!realVal || !realDate) { showToast('Preencha o valor e a data.'); return; }
+  const dateParts = realDate.split('-');
+  const dateFormatted = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+  const ml = MONTHS[parseInt(dateParts[1])-1] + ' ' + dateParts[0];
+  // Update row: change Projeção to Não, update value and date
+  const updated = [...r];
+  while (updated.length < 9) updated.push('');
+  updated[0] = dateFormatted;  // real date
+  updated[4] = realVal;        // real value
+  updated[6] = 'Não';          // no longer a projection
+  updated[7] = ml;             // update month ref
+  showToast('Salvando...');
+  closeModal();
+  selectedTx = null;
+  await updateRow('Lancamentos', idx + 2, updated);
+  await loadAll();
+  showToast('Lançamento realizado! ✓');
 }
 function editTx() {
   const {idx, sheet} = selectedTx || {};
@@ -807,7 +870,7 @@ function setCCMonth(m, el) {
   setCCMonthRender(m);
 }
 function setCCMonthRender(m) {
-  const rows = ccData.filter(r=>(r[6]||'')===m);
+  const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
   const total = rows.reduce((s,r)=>s+parseVal(r[3]),0);
   const status = rows[0] ? (rows[0][7]||'') : '';
   // Category breakdown
@@ -817,10 +880,17 @@ function setCCMonthRender(m) {
     const pct = total>0 ? Math.round(v/total*100) : 0;
     return `<div class="cr"><div class="cd" style="background:${catColors[c]||'#888'};"></div><span class="cn">${c}</span><div class="cbw"><div class="cbf" style="width:${pct}%;background:${catColors[c]||'#888'};"></div></div><span class="cv">${fmt(v)}</span></div>`;
   }).join('');
-  const statusBadge = status==='Pago'?'✓ Pago':status==='Projeção'?'⏳ Projeção — em aberto':'📋 Em aberto';
+  // Determine status from ALL rows (case-insensitive)
+  const allPago = rows.length > 0 && rows.every(r=>(r[7]||'').toLowerCase()==='pago');
+  const hasProj = rows.some(r=>(r[7]||'').toLowerCase()==='projeção');
+  const statusBadge = allPago ? '✓ Pago' : hasProj ? '⏳ Projeção — em aberto' : '📋 Em aberto';
+  const statusColor = allPago ? 'color:var(--green)' : 'color:var(--text3)';
+  // Show/hide pagar fatura button
+  const pagarBtn = document.getElementById('cc-pagar-btn');
+  if (pagarBtn) pagarBtn.style.display = allPago ? 'none' : 'block';
   document.getElementById('cc-summary').innerHTML = `
     <div class="row"><span class="lbl">Total da fatura</span><span class="val big neg">${fmt(total)}</span></div>
-    <div style="font-size:11px;color:var(--text3);margin-top:2px;">${statusBadge}</div>
+    <div style="font-size:11px;${statusColor};margin-top:2px;">${statusBadge}</div>
     <hr class="div">
     <div class="sec-lbl" style="margin-bottom:8px;">por categoria</div>
     ${catHtml || '<div class="empty">Sem lançamentos</div>'}
@@ -1323,7 +1393,11 @@ async function submitTx() {
             }
           }
           window._faturaToMark = null;
+          await loadAll();
+          resetAddForm();
+          buildCCTabs();
           showToast('Fatura marcada como paga! ✓');
+          return;
         }
       }
     }
