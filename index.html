@@ -1120,13 +1120,25 @@ async function submitTx() {
   const payLabel = payLabels[payMethod] || payMethod;
   const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payLabel, isProj, ml, obs];
   
-  // If CC, also add to Cartão C6 sheet
-  let ccRow = null;
+  // If CC, create one row per installment in correct month
+  let ccRows = [];
   if (payMethod === 'CartaoC6') {
     const fatura = document.getElementById('inp-fatura').value;
     const parc = parseInt(document.getElementById('inp-parc').value) || 1;
-    const parcVal = rawVal / parc;
-    ccRow = [dateFormatted, desc, cat, rawVal, parc, parcVal, fatura, isProj==='Sim'?'Projeção':'Em aberto', obs];
+    const parcVal = parseFloat((rawVal / parc).toFixed(2));
+    // Parse starting month/year from fatura (e.g. "Maio 2026")
+    const fatParts = fatura.split(' ');
+    let fatM = MONTHS.indexOf(fatParts[0]); // 0-based
+    let fatY = parseInt(fatParts[1]);
+    for (let i = 0; i < parc; i++) {
+      const fatLabel = MONTHS[fatM] + ' ' + fatY;
+      const parcLabel = parc > 1 ? `${i+1}/${parc}` : '';
+      const rowObs = [obs, parcLabel].filter(Boolean).join(' · ');
+      ccRows.push([dateFormatted, desc, cat, parcVal, parc > 1 ? `${i+1}/${parc}` : 1, parcVal, fatLabel, 'Em aberto', rowObs]);
+      // Advance to next month
+      fatM++;
+      if (fatM > 11) { fatM = 0; fatY++; }
+    }
   }
 
   // Reembolso / A Receber
@@ -1146,7 +1158,7 @@ async function submitTx() {
     reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', obs, tipo, pessoaNome];
   }
 
-  console.log('DEBUG submitTx → payMethod:', payMethod, '| ccRow:', ccRow ? 'yes' : 'null');
+  console.log('DEBUG submitTx → payMethod:', payMethod, '| ccRows:', ccRows.length);
   showToast('Salvando...');
   try {
     if (editingRow) {
@@ -1155,10 +1167,12 @@ async function submitTx() {
     } else {
       if (payMethod === 'CartaoC6') {
         // CC payments: only save to CartaoC6, NOT Lancamentos
-        // They only affect the balance when the bill is paid
-        if (ccRow) await appendRow('CartaoC6', ccRow);
+        // Save one row per installment
+        for (const r of ccRows) {
+          await appendRow('CartaoC6', r);
+        }
         if (reimbRow) await appendRow('Reembolsos', reimbRow);
-        showToast('Lançado no cartão C6! ✓');
+        showToast(`Lançado no C6! ${ccRows.length > 1 ? ccRows.length + ' parcelas criadas ✓' : '✓'}`);
       } else {
         // All other payments: save to Lancamentos
         await appendRow('Lancamentos', row);
