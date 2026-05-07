@@ -339,10 +339,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
             <button class="popt" onclick="selPay('Dinheiro',this)"><i class="ti ti-cash"></i><br>Dinheiro</button>
           </div>
           <div id="cc-fatura-sec" style="display:none;">
+            <div style="background:#EEF2FF;border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#3B5BDB;">
+              💳 Este gasto vai para a fatura do C6 e só afeta seu saldo quando a fatura for paga.
+            </div>
             <div class="fg"><label>Em qual fatura vai cair?</label>
               <select id="inp-fatura">
-                <option>Abril 2026</option><option>Maio 2026</option><option>Junho 2026</option>
-                <option>Julho 2026</option><option>Agosto 2026</option><option>Setembro 2026</option>
+                <option>Março 2026</option><option>Abril 2026</option><option>Maio 2026</option>
+                <option>Junho 2026</option><option>Julho 2026</option><option>Agosto 2026</option>
+                <option>Setembro 2026</option><option>Outubro 2026</option><option>Novembro 2026</option>
+                <option>Dezembro 2026</option>
               </select>
             </div>
             <div class="fg"><label>Parcelas</label><input type="number" value="1" min="1" max="48" id="inp-parc"></div>
@@ -1139,10 +1144,18 @@ async function submitTx() {
       await updateRow(editingSheet || 'Lancamentos', editingRow, row);
       showToast('Lançamento atualizado! ✓');
     } else {
-      await appendRow('Lancamentos', row);
-      if (ccRow) await appendRow('CartaoC6', ccRow);
-      if (reimbRow) await appendRow('Reembolsos', reimbRow);
-      showToast('Lançamento salvo! ✓');
+      if (payMethod === 'Cartão C6') {
+        // CC payments: only save to CartaoC6, NOT Lancamentos
+        // They only affect the balance when the bill is paid
+        if (ccRow) await appendRow('CartaoC6', ccRow);
+        if (reimbRow) await appendRow('Reembolsos', reimbRow);
+        showToast('Lançado no cartão C6! ✓');
+      } else {
+        // All other payments: save to Lancamentos
+        await appendRow('Lancamentos', row);
+        if (reimbRow) await appendRow('Reembolsos', reimbRow);
+        showToast('Lançamento salvo! ✓');
+      }
     }
     await loadAll();
     resetAddForm();
