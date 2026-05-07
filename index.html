@@ -889,15 +889,40 @@ function renderReimb() {
     : '<div class="empty">Nenhum recebimento ainda</div>';
 }
 async function markReimbReceived(idx) {
-  const r = [...reimbData[idx]];
-  r[4] = 'Recebido';
-  r[5] = new Date().toLocaleDateString('pt-BR');
-  r[6] = parseVal(r[2]); // valor recebido = valor original
-  showToast('Atualizando...');
-  await updateRow('Reembolsos', idx+2, r);
+  const r = reimbData[idx];
+  const desc = r[1] || 'este item';
+  const val = parseVal(r[2]);
+  const isPessoa = (r[8]||'').trim().toLowerCase() === 'pessoa';
+  const nome = r[9] || '';
+  if (!confirm(`Confirmar recebimento de ${fmt(val)} referente a "${desc}"?`)) return;
+
+  // 1. Mark as received in Reembolsos sheet
+  const updated = [...r];
+  while (updated.length < 10) updated.push('');
+  updated[4] = 'Recebido';
+  const today = new Date();
+  const todayFormatted = today.toLocaleDateString('pt-BR');
+  updated[5] = todayFormatted;
+  updated[6] = val;
+
+  // 2. Create a Receita entry in Lancamentos
+  const dd = String(today.getDate()).padStart(2,'0');
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const yyyy = today.getFullYear();
+  const dateFormatted = `${dd}/${mm}/${yyyy}`;
+  const ml = MONTHS[today.getMonth()] + ' ' + yyyy;
+  const receitaDesc = isPessoa && nome
+    ? `Reembolso recebido — ${desc} (${nome})`
+    : `Reembolso recebido — ${desc}`;
+  const meio = isPessoa ? 'Reembolso pessoa' : 'Reembolso empresa';
+  const lancRow = [dateFormatted, 'Receita', receitaDesc, '', val, meio, 'Não', ml, ''];
+
+  showToast('Registrando...');
+  await updateRow('Reembolsos', idx+2, updated);
+  await appendRow('Lancamentos', lancRow);
   await loadAll();
   renderReimb();
-  showToast('Reembolso marcado como recebido! ✓');
+  showToast('Reembolso recebido e lançado! ✓');
 }
 
 // ── CATEGORIAS ───────────────────────────────────────────
