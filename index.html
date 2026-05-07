@@ -307,6 +307,25 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           </div>
           <div class="fg"><label>Data <span style="font-size:10px;color:var(--text3);">(futura = projeção automática)</span></label><input type="date" id="inp-date"></div>
           <div class="fg"><label>Observação (opcional)</label><input type="text" id="inp-obs" placeholder="Ex: parcela 1/3, reembolso pendente..."></div>
+          <div class="fg">
+            <label>Repetir nos próximos meses?</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+              <input type="checkbox" id="inp-recorrente" onchange="toggleRecorrente()" style="width:18px;height:18px;cursor:pointer;">
+              <span style="font-size:13px;color:var(--text2);">Sim, é um lançamento recorrente</span>
+            </div>
+            <div id="fg-recorrente-meses" style="display:none;">
+              <select id="inp-recorrente-meses" style="width:100%;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:13px;background:var(--bg);color:var(--text);">
+                <option value="3">3 meses</option>
+                <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
+                <option value="0">Indefinido (até eu deletar)</option>
+                <option value="custom">Outro número...</option>
+              </select>
+              <input type="number" id="inp-recorrente-custom" min="1" max="120" placeholder="Quantos meses?" style="display:none;width:100%;margin-top:6px;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:13px;background:var(--bg);color:var(--text);">
+              <div style="font-size:10px;color:var(--text3);margin-top:4px;">Um lançamento projetado será criado em cada mês futuro</div>
+            </div>
+          </div>
           <div id="fg-reimb-fields" style="display:none;">
             <div class="fg">
               <label id="lbl-reimb-date">Data estimada do reembolso</label>
@@ -1096,6 +1115,12 @@ function resetAddForm() {
   document.getElementById('inp-cat').value = 'Moradia';
   document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('inp-obs').value = '';
+  const recChk = document.getElementById('inp-recorrente');
+  if (recChk) { recChk.checked = false; }
+  const recMeses = document.getElementById('fg-recorrente-meses');
+  if (recMeses) recMeses.style.display = 'none';
+  const recCustom = document.getElementById('inp-recorrente-custom');
+  if (recCustom) { recCustom.value = ''; recCustom.style.display = 'none'; }
   goStep1();
 }
 function setType(t) {
@@ -1105,6 +1130,18 @@ function setType(t) {
   document.getElementById('fg-cat').style.display = t==='inc'?'none':'block';
   checkReimbField();
 }
+function toggleRecorrente() {
+  const checked = document.getElementById('inp-recorrente').checked;
+  document.getElementById('fg-recorrente-meses').style.display = checked ? 'block' : 'none';
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'inp-recorrente-meses') {
+    const custom = document.getElementById('inp-recorrente-custom');
+    custom.style.display = e.target.value === 'custom' ? 'block' : 'none';
+  }
+});
+
 function checkReimbField() {
   const cat = document.getElementById('inp-cat').value;
   const isReimb = cat === 'Despesa Reembolsável';
@@ -1277,6 +1314,28 @@ async function submitTx() {
         }
       }
     }
+    // Handle recurring entries
+    const isRecorrente = document.getElementById('inp-recorrente')?.checked;
+    if (isRecorrente && payMethod !== 'CartaoC6') {
+      const mesesSel = document.getElementById('inp-recorrente-meses')?.value;
+      const mesesCustom = parseInt(document.getElementById('inp-recorrente-custom')?.value);
+      const totalMeses = mesesSel === '0' ? 24 : // indefinido = 24 meses
+                         mesesSel === 'custom' ? (mesesCustom || 6) :
+                         parseInt(mesesSel) || 6;
+      // Start from next month
+      let recM = parseInt(dateParts[1]) - 1; // 0-based
+      let recY = parseInt(dateParts[0]);
+      recM++; if (recM > 11) { recM = 0; recY++; }
+      for (let i = 0; i < totalMeses; i++) {
+        const recMl = MONTHS[recM] + ' ' + recY;
+        const recRow = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payLabel, 'Sim', recMl, obs ? obs + ' (recorrente)' : 'recorrente'];
+        await appendRow('Lancamentos', recRow);
+        recM++; if (recM > 11) { recM = 0; recY++; }
+      }
+      const label = mesesSel === '0' ? 'por 24 meses' : `por ${totalMeses} meses`;
+      showToast(`Recorrente criado ${label}! ✓`);
+    }
+
     await loadAll();
     resetAddForm();
     goTo('home');
