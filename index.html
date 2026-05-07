@@ -581,7 +581,18 @@ function renderHome() {
   const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
   const saldoInicial = calcSaldoInicial();
   const saldo = saldoInicial + receitas - gastos;
-  const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  // Add pending reembolsos estimated for this month
+  const projRec_reimb = reimbData.filter(r=>{
+    if ((r[4]||'').toLowerCase() !== 'pendente') return false;
+    const estDate = r[5]||''; // format DD/MM/YYYY
+    if (!estDate) return false;
+    const parts = estDate.split('/');
+    if (parts.length < 3) return false;
+    const estMonth = MONTHS[parseInt(parts[1])-1] + ' ' + parts[2];
+    return estMonth.toLowerCase() === ml_lower;
+  }).reduce((s,r)=>s+parseVal(r[2]),0);
+  const projRec = projRec_tx + projRec_reimb;
   const projGasto = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
 
   // CC fatura do mês - case insensitive match
