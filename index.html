@@ -1287,8 +1287,9 @@ function pagarFatura() {
     document.getElementById('inp-val').value = valFormatted;
     document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('inp-obs').value = `Fatura ${fullLabel}`;
-    // Store fatura info to mark as paid after saving
-    window._faturaToMark = { label: fullLabel, ccRows: ccMonth };
+    // Store fatura indices to mark as paid after saving
+    const ccIndices = ccMonth.map(r => ccData.indexOf(r)).filter(i => i >= 0);
+    window._faturaToMark = { label: fullLabel, ccIndices };
   }, 100);
 }
 
@@ -1382,11 +1383,15 @@ async function submitTx() {
         showToast('Lançamento salvo! ✓');
         // If paying CC bill, mark all CC rows as "Pago"
         if (cat === 'Pagamento Fatura C6' && window._faturaToMark) {
-          const {label, ccRows: ccMonthRows} = window._faturaToMark;
-          for (let i = 0; i < ccMonthRows.length; i++) {
-            const ccIdx = ccData.indexOf(ccMonthRows[i]);
+          const {label, ccIndices} = window._faturaToMark;
+          // Re-fetch CC data for this month to get fresh indices
+          const fatLabel = label;
+          const freshCCRows = ccData.filter(r=>(r[6]||'').toLowerCase()===fatLabel.toLowerCase());
+          const rowsToMark = freshCCRows.length > 0 ? freshCCRows : ccIndices.map(i=>ccData[i]).filter(Boolean);
+          for (const ccRow of rowsToMark) {
+            const ccIdx = ccData.indexOf(ccRow);
             if (ccIdx >= 0) {
-              const updated = [...ccData[ccIdx]];
+              const updated = [...ccRow];
               while (updated.length < 9) updated.push('');
               updated[7] = 'Pago';
               await updateRow('CartaoC6', ccIdx + 2, updated);
