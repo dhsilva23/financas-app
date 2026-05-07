@@ -1113,7 +1113,7 @@ async function markReimbReceived(idx) {
 function renderCats() {
   const ml = catMonthLabel();
   const ml_lower = ml.toLowerCase();
-  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável' && r[3]!=='Pagamento Fatura C6');
+  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável' && r[3]!=='Pagamento Fatura C6' && r[3]!=='Transferência entre contas');
   const ccMonth = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
   // Merge: direct + cc items
   const cats = {};
@@ -1158,7 +1158,7 @@ function renderHealth() {
 
   const ml_h = curMonthLabel().toLowerCase();
   const monthTxH = txData.filter(r=>(r[7]||'').toLowerCase()===ml_h);
-  const gastosReais = monthTxH.filter(r=>r[1]==='Gasto'&&r[6]!=='Sim'&&r[5]!=='Swile'&&r[3]!=='Pagamento Fatura C6').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastosReais = monthTxH.filter(r=>r[1]==='Gasto'&&r[6]!=='Sim'&&r[5]!=='Swile'&&r[3]!=='Pagamento Fatura C6'&&r[3]!=='Transferência entre contas').reduce((s,r)=>s+parseVal(r[4]),0);
   const pendentes = reimbData.filter(r=>(r[4]||'').toLowerCase()==='pendente');
   const totalPend = pendentes.reduce((s,r)=>s+parseVal(r[2]),0);
   const reservaMeses = reservaMeta>0?(poupSaldo/reservaMeta*6):0;
@@ -1449,7 +1449,8 @@ async function submitTx() {
     try {
       // Debit from source account
       if (conta === 'C6') {
-        await appendRow('Lancamentos', [dateFormatted,'Transferência',desc,'Transferência entre contas',rawVal,'Transferência','Não',ml,`→ ${contaDest}`]);
+        // Gasto no C6 — deduz do saldo
+        await appendRow('Lancamentos', [dateFormatted,'Gasto',desc,'Transferência entre contas',rawVal,'Transferência','Não',ml,`→ ${contaDest}`]);
       } else if (conta === 'Caixa') {
         await appendRow('ContaCaixa', [dateFormatted, desc, 'Transferência Enviada', rawVal, '']);
       }
@@ -1457,6 +1458,7 @@ async function submitTx() {
       if (contaDest === 'Caixa') {
         await appendRow('ContaCaixa', [dateFormatted, desc, 'Transferência Recebida', rawVal, '']);
       } else if (contaDest === 'C6') {
+        // Receita no C6 — soma ao saldo
         await appendRow('Lancamentos', [dateFormatted,'Receita',desc,'Transferência entre contas',rawVal,'Transferência','Não',ml,`← ${conta}`]);
       }
       await loadAll(); resetAddForm(); goTo('home');
