@@ -548,7 +548,7 @@ async function loadAll() {
       getRange('Lancamentos!A2:I500'),
       getRange('CartaoC6!A2:I500'),
       getRange('Swile!A2:H200'),
-      getRange('Reembolsos!A2:H200'),
+      getRange('Reembolsos!A2:J200'),
       getRange('Poupanca!A2:F50'),
       getRange('Metas!A3:C10')
     ]);
@@ -827,10 +827,10 @@ function renderSwile() {
 
 // ── REEMBOLSOS ───────────────────────────────────────────
 function renderReimb() {
-  const pendentes = reimbData.filter(r=>(r[4]||'')==='Pendente');
-  const recebidos = reimbData.filter(r=>(r[4]||'')==='Recebido');
-  const totalEmpresa = pendentes.filter(r=>{const t=(r[8]||'').trim(); return t==='' || t==='Empresa';}).reduce((s,r)=>s+parseVal(r[2]),0);
-  const totalPessoa = pendentes.filter(r=>(r[8]||'').trim()==='Pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
+  const pendentes = reimbData.filter(r=>(r[4]||'').trim().toLowerCase()==='pendente');
+  const recebidos = reimbData.filter(r=>(r[4]||'').trim().toLowerCase()==='recebido');
+  const totalEmpresa = pendentes.filter(r=>{const t=(r[8]||'').trim().toLowerCase(); return t==='' || t==='empresa';}).reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPessoa = pendentes.filter(r=>(r[8]||'').trim().toLowerCase()==='pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
   const totalPend = totalEmpresa + totalPessoa;
   document.getElementById('reimb-total').innerHTML = `
     <div class="row"><span class="lbl" style="color:#8A5800;">Total em aberto</span><span class="val big warn">${fmt(totalPend)}</span></div>
@@ -842,7 +842,7 @@ function renderReimb() {
   document.getElementById('reimb-open').innerHTML = pendentes.length
     ? pendentes.map((r,i)=>{
         const realIdx = reimbData.indexOf(r);
-        const isPessoa = (r[8]||'') === 'Pessoa';
+        const isPessoa = (r[8]||'').trim().toLowerCase() === 'pessoa';
         const nome = r[9] || '';
         const tag = isPessoa
           ? `<span class="chip" style="background:#EEF2FF;color:#3B5BDB;">👤 ${nome||'Pessoa'}</span>`
@@ -862,7 +862,7 @@ function renderReimb() {
     : '<div class="empty">Nada pendente 🎉</div>';
   document.getElementById('reimb-done').innerHTML = recebidos.length
     ? recebidos.map(r=>{
-        const isPessoa = (r[8]||'') === 'Pessoa';
+        const isPessoa = (r[8]||'').trim().toLowerCase() === 'pessoa';
         const nome = r[9] || '';
         return `<div class="tx">
           <div class="tx-ico" style="background:var(--green-l);"><i class="ti ti-check" style="color:var(--green-d);"></i></div>
@@ -879,11 +879,12 @@ async function markReimbReceived(idx) {
   const r = [...reimbData[idx]];
   r[4] = 'Recebido';
   r[5] = new Date().toLocaleDateString('pt-BR');
-  r[6] = r[2];
+  r[6] = parseVal(r[2]); // valor recebido = valor original
   showToast('Atualizando...');
   await updateRow('Reembolsos', idx+2, r);
   await loadAll();
-  showToast('Reembolso marcado como recebido!');
+  renderReimb();
+  showToast('Reembolso marcado como recebido! ✓');
 }
 
 // ── CATEGORIAS ───────────────────────────────────────────
