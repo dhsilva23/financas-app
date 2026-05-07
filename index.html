@@ -604,12 +604,22 @@ function renderHome() {
   `;
 
   // Reembolsos banner
-  const pendentes = reimbData.filter(r=>(r[4]||'')==='Pendente');
-  const totalPend = pendentes.reduce((s,r)=>s+parseVal(r[2]),0);
+  const pendentes = reimbData.filter(r=>(r[4]||'').trim().toLowerCase()==='pendente');
+  const totalEmpresaBanner = pendentes.filter(r=>{const t=(r[8]||'').trim().toLowerCase(); return t===''||t==='empresa';}).reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPessoaBanner = pendentes.filter(r=>(r[8]||'').trim().toLowerCase()==='pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPend = totalEmpresaBanner + totalPessoaBanner;
   const banner = document.getElementById('reimb-banner');
   if (totalPend > 0) {
     banner.style.display='flex';
-    document.getElementById('reimb-banner-val').textContent = `${fmt(totalPend)} a receber da empresa`;
+    let bannerText = '';
+    if (totalEmpresaBanner > 0 && totalPessoaBanner > 0) {
+      bannerText = `🏢 ${fmt(totalEmpresaBanner)} · 👤 ${fmt(totalPessoaBanner)}`;
+    } else if (totalEmpresaBanner > 0) {
+      bannerText = `${fmt(totalEmpresaBanner)} a receber da empresa`;
+    } else {
+      bannerText = `${fmt(totalPessoaBanner)} a receber de pessoas`;
+    }
+    document.getElementById('reimb-banner-val').textContent = bannerText;
   } else { banner.style.display='none'; }
 
   // Recent transactions
