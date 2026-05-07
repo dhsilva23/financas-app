@@ -291,7 +291,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           <button class="tbtn" id="btn-inc" onclick="setType('inc')">↓ Receita</button>
         </div>
         <div class="step active" id="step1">
-          <div class="fg"><label>Valor (R$)</label><input type="text" inputmode="decimal" placeholder="0,00" id="inp-val" style="font-size:22px;font-weight:600;" oninput="maskCurrency(this)"></div>
+          <div class="fg">
+            <label>Valor (R$) <span id="val-hint" style="font-weight:400;color:var(--text3);font-size:10px;"></span></label>
+            <input type="text" inputmode="decimal" placeholder="0,00" id="inp-val" style="font-size:22px;font-weight:600;" oninput="maskCurrency(this)">
+          </div>
           <div class="fg"><label>Descrição</label><input type="text" placeholder="Ex: Salão, Mercado, Hotel..." id="inp-desc"></div>
           <div class="fg" id="fg-cat"><label>Categoria</label>
             <select id="inp-cat" onchange="checkReimbField()">
@@ -340,9 +343,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           </div>
           <div id="cc-fatura-sec" style="display:none;">
             <div style="background:#EEF2FF;border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#3B5BDB;">
-              💳 Este gasto vai para a fatura do C6 e só afeta seu saldo quando a fatura for paga.
+              💳 Lance o valor da parcela (o que aparece na fatura). O app replica o mesmo valor nos meses seguintes.
             </div>
-            <div class="fg"><label>Em qual fatura vai cair?</label>
+            <div class="fg"><label>Em qual fatura vai cair a 1ª parcela?</label>
               <select id="inp-fatura">
                 <option>Março 2026</option><option>Abril 2026</option><option>Maio 2026</option>
                 <option>Junho 2026</option><option>Julho 2026</option><option>Agosto 2026</option>
@@ -1097,6 +1100,8 @@ function selPay(m, el) {
   el.closest('.popts').querySelectorAll('.popt').forEach(p=>p.classList.remove('sel'));
   el.classList.add('sel');
   document.getElementById('cc-fatura-sec').style.display = (m==='CartaoC6')?'block':'none';
+  const hint = document.getElementById('val-hint');
+  if (hint) hint.textContent = m === 'CartaoC6' ? '— valor da parcela' : '';
 }
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
@@ -1120,22 +1125,22 @@ async function submitTx() {
   const payLabel = payLabels[payMethod] || payMethod;
   const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payLabel, isProj, ml, obs];
   
-  // If CC, create one row per installment in correct month
+  // If CC, create one row per installment — rawVal IS the parcela value
   let ccRows = [];
   if (payMethod === 'CartaoC6') {
     const fatura = document.getElementById('inp-fatura').value;
     const parc = parseInt(document.getElementById('inp-parc').value) || 1;
-    const parcVal = parseFloat((rawVal / parc).toFixed(2));
+    const parcVal = rawVal; // user enters parcela value directly
+    const totalVal = parseFloat((parcVal * parc).toFixed(2));
     // Parse starting month/year from fatura (e.g. "Maio 2026")
     const fatParts = fatura.split(' ');
-    let fatM = MONTHS.indexOf(fatParts[0]); // 0-based
+    let fatM = MONTHS.indexOf(fatParts[0]);
     let fatY = parseInt(fatParts[1]);
     for (let i = 0; i < parc; i++) {
       const fatLabel = MONTHS[fatM] + ' ' + fatY;
       const parcLabel = parc > 1 ? `${i+1}/${parc}` : '';
       const rowObs = [obs, parcLabel].filter(Boolean).join(' · ');
       ccRows.push([dateFormatted, desc, cat, parcVal, parc > 1 ? `${i+1}/${parc}` : 1, parcVal, fatLabel, 'Em aberto', rowObs]);
-      // Advance to next month
       fatM++;
       if (fatM > 11) { fatM = 0; fatY++; }
     }
@@ -1158,7 +1163,7 @@ async function submitTx() {
     reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', obs, tipo, pessoaNome];
   }
 
-  console.log('DEBUG submitTx → payMethod:', payMethod, '| ccRows:', ccRows.length);
+
   showToast('Salvando...');
   try {
     if (editingRow) {
