@@ -183,7 +183,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <div class="card" id="cc-summary"><div class="loading"><div class="spinner"></div></div></div>
         <div class="sec-lbl">lançamentos</div>
         <div class="txl" id="cc-txs"><div class="loading"><div class="spinner"></div></div></div>
-        <button onclick="goTo('add')" style="width:100%;margin-top:12px;padding:11px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:none;color:var(--green);font-size:13px;cursor:pointer;"><i class="ti ti-plus"></i> Lançar no cartão</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+          <button onclick="goTo('add')" style="padding:11px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:none;color:var(--green);font-size:13px;cursor:pointer;"><i class="ti ti-plus"></i> Lançar no cartão</button>
+          <button onclick="pagarFatura()" style="padding:11px;border:none;border-radius:var(--r-md);background:var(--blue-l);color:var(--blue);font-size:13px;cursor:pointer;font-weight:500;"><i class="ti ti-wallet"></i> Pagar fatura</button>
+        </div>
       </div>
     </div>
 
@@ -299,7 +302,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
               <option>Moda & Acessórios</option><option>Lazer</option><option>Viagens (pessoal)</option>
               <option>Assinaturas</option><option>Jimmy</option><option>Dízimo/Doações</option>
               <option>Despesa Reembolsável</option>
-              <option>A Receber (Pessoa)</option><option>Investimentos/Poupança</option><option>Outros</option>
+              <option>A Receber (Pessoa)</option><option>Investimentos/Poupança</option><option>Pagamento Fatura C6</option><option>Outros</option>
             </select>
           </div>
           <div class="fg"><label>Data <span style="font-size:10px;color:var(--text3);">(futura = projeção automática)</span></label><input type="date" id="inp-date"></div>
@@ -636,7 +639,7 @@ const catColors = {
   'Moda & Acessórios':'#E67E22','Lazer':'#7F77DD','Viagens (pessoal)':'#00ACC1',
   'Assinaturas':'#7F77DD','Jimmy':'#639922','Dízimo/Doações':'#888780',
   'Despesa Reembolsável':'#8A5800','A Receber (Pessoa)':'#3B5BDB',
-  'Investimentos/Poupança':'#1D9E75','Outros':'#888780'
+  'Investimentos/Poupança':'#1D9E75','Pagamento Fatura C6':'#3266ad','Outros':'#888780'
 };
 const catIcons = {
   'Moradia':'home','Casa & Decoração':'sofa','Alimentação':'tools-kitchen-2',
@@ -644,7 +647,7 @@ const catIcons = {
   'Moda & Acessórios':'hanger','Lazer':'ticket','Viagens (pessoal)':'plane',
   'Assinaturas':'music','Jimmy':'paw','Dízimo/Doações':'hand-heart',
   'Despesa Reembolsável':'briefcase','A Receber (Pessoa)':'user',
-  'Investimentos/Poupança':'trending-up','Outros':'dots'
+  'Investimentos/Poupança':'trending-up','Pagamento Fatura C6':'credit-card','Outros':'dots'
 };
 
 function txRow(r, idx, sheet) {
@@ -901,7 +904,7 @@ async function markReimbReceived(idx) {
 function renderCats() {
   const ml = catMonthLabel();
   const ml_lower = ml.toLowerCase();
-  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável');
+  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável' && r[3]!=='Pagamento Fatura C6');
   const ccMonth = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
   // Merge: direct + cc items
   const cats = {};
@@ -1103,6 +1106,36 @@ function selPay(m, el) {
   const hint = document.getElementById('val-hint');
   if (hint) hint.textContent = m === 'CartaoC6' ? '— valor da parcela' : '';
 }
+function pagarFatura() {
+  // Get current CC month being viewed
+  const activeTab = document.querySelector('.cct.active');
+  const faturaLabel = activeTab ? activeTab.textContent.trim() : '';
+  // Convert short label (e.g. "Mai 26") to full (e.g. "Maio 2026")
+  const shortMonths = {'Jan':'Janeiro','Fev':'Fevereiro','Mar':'Março','Abr':'Abril',
+    'Mai':'Maio','Jun':'Junho','Jul':'Julho','Ago':'Agosto','Set':'Setembro',
+    'Out':'Outubro','Nov':'Novembro','Dez':'Dezembro'};
+  const parts = faturaLabel.split(' ');
+  const fullMonth = shortMonths[parts[0]] || parts[0];
+  const fullYear = parts[1] ? '20' + parts[1] : new Date().getFullYear();
+  const fullLabel = fullMonth + ' ' + fullYear;
+  // Get fatura total
+  const ccMonth = ccData.filter(r=>(r[6]||'').toLowerCase()===fullLabel.toLowerCase());
+  const total = ccMonth.reduce((s,r)=>s+parseVal(r[3]),0);
+  // Pre-fill the add form
+  goTo('add');
+  setType('exp');
+  setTimeout(() => {
+    document.getElementById('inp-desc').value = `Pagamento fatura C6 — ${fullLabel}`;
+    document.getElementById('inp-cat').value = 'Pagamento Fatura C6';
+    const valFormatted = total.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('inp-val').value = valFormatted;
+    document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('inp-obs').value = `Fatura ${fullLabel}`;
+    // Store fatura info to mark as paid after saving
+    window._faturaToMark = { label: fullLabel, ccRows: ccMonth };
+  }, 100);
+}
+
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
   const rawVal = parseVal(document.getElementById('inp-val').value);
@@ -1191,6 +1224,21 @@ async function submitTx() {
         await appendRow('Lancamentos', row);
         if (reimbRow) await appendRow('Reembolsos', reimbRow);
         showToast('Lançamento salvo! ✓');
+        // If paying CC bill, mark all CC rows as "Pago"
+        if (cat === 'Pagamento Fatura C6' && window._faturaToMark) {
+          const {label, ccRows: ccMonthRows} = window._faturaToMark;
+          for (let i = 0; i < ccMonthRows.length; i++) {
+            const ccIdx = ccData.indexOf(ccMonthRows[i]);
+            if (ccIdx >= 0) {
+              const updated = [...ccData[ccIdx]];
+              while (updated.length < 9) updated.push('');
+              updated[7] = 'Pago';
+              await updateRow('CartaoC6', ccIdx + 2, updated);
+            }
+          }
+          window._faturaToMark = null;
+          showToast('Fatura marcada como paga! ✓');
+        }
       }
     }
     await loadAll();
