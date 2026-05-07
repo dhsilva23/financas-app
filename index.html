@@ -1146,6 +1146,7 @@ async function submitTx() {
     reimbRow = [dateFormatted, desc, rawVal, payMethod, 'Pendente', rdFormatted, '', obs, tipo, pessoaNome];
   }
 
+  console.log('DEBUG submitTx → payMethod:', payMethod, '| ccRow:', ccRow ? 'yes' : 'null');
   showToast('Salvando...');
   try {
     if (editingRow) {
