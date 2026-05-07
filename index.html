@@ -479,8 +479,8 @@ function calcSaldoInicial() {
     if (monthIdx === -1 || !parts[1]) return;
     const key = parseInt(parts[1])*12 + monthIdx;
     if (key < curKey && r[6] !== 'Sim') {
-      if (r[1]==='Receita') saldoAnterior += parseVal(r[4]);
-      else if (r[1]==='Gasto') saldoAnterior -= parseVal(r[4]);
+      if (r[1]==='Receita' && r[5]!=='Crédito Swile') saldoAnterior += parseVal(r[4]);
+      else if (r[1]==='Gasto' && r[5]!=='Swile') saldoAnterior -= parseVal(r[4]);
     }
   });
   return saldoAnterior;
@@ -574,8 +574,8 @@ function renderHome() {
   const ml = curMonthLabel();
   const ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
-  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
-  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
   const saldoInicial = calcSaldoInicial();
   const saldo = saldoInicial + receitas - gastos;
   const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
@@ -829,8 +829,8 @@ function renderSwile() {
 function renderReimb() {
   const pendentes = reimbData.filter(r=>(r[4]||'')==='Pendente');
   const recebidos = reimbData.filter(r=>(r[4]||'')==='Recebido');
-  const totalEmpresa = pendentes.filter(r=>(r[8]||'Empresa')==='Empresa').reduce((s,r)=>s+parseVal(r[2]),0);
-  const totalPessoa = pendentes.filter(r=>(r[8]||'')==='Pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalEmpresa = pendentes.filter(r=>{const t=(r[8]||'').trim(); return t==='' || t==='Empresa';}).reduce((s,r)=>s+parseVal(r[2]),0);
+  const totalPessoa = pendentes.filter(r=>(r[8]||'').trim()==='Pessoa').reduce((s,r)=>s+parseVal(r[2]),0);
   const totalPend = totalEmpresa + totalPessoa;
   document.getElementById('reimb-total').innerHTML = `
     <div class="row"><span class="lbl" style="color:#8A5800;">Total em aberto</span><span class="val big warn">${fmt(totalPend)}</span></div>
@@ -889,8 +889,9 @@ async function markReimbReceived(idx) {
 // ── CATEGORIAS ───────────────────────────────────────────
 function renderCats() {
   const ml = catMonthLabel();
-  const monthTx = txData.filter(r=>(r[7]||'')===ml && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável');
-  const ccMonth = ccData.filter(r=>(r[6]||'')===ml);
+  const ml_lower = ml.toLowerCase();
+  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower && r[1]==='Gasto' && r[3]!=='Despesa Reembolsável');
+  const ccMonth = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
   // Merge: direct + cc items
   const cats = {};
   monthTx.forEach(r=>{ const c=r[3]||'Outros'; cats[c]=(cats[c]||0)+parseVal(r[4]); });
@@ -1160,12 +1161,20 @@ async function submitTx() {
     } else {
       if (payMethod === 'CartaoC6') {
         // CC payments: only save to CartaoC6, NOT Lancamentos
-        // Save one row per installment
         for (const r of ccRows) {
           await appendRow('CartaoC6', r);
         }
         if (reimbRow) await appendRow('Reembolsos', reimbRow);
         showToast(`Lançado no C6! ${ccRows.length > 1 ? ccRows.length + ' parcelas criadas ✓' : '✓'}`);
+      } else if (payMethod === 'Crédito Swile') {
+        // Swile credit: save to Swile sheet only, NOT Lancamentos
+        const swileRow = [ml, 1000, '', '', dateFormatted, desc, rawVal, 'Crédito'];
+        await appendRow('Swile', swileRow);
+        showToast('Crédito Swile registrado! ✓');
+      } else if (payMethod === 'Swile') {
+        // Swile expense: save to Lancamentos (for category tracking) but mark as Swile
+        await appendRow('Lancamentos', row);
+        showToast('Gasto Swile registrado! ✓');
       } else {
         // All other payments: save to Lancamentos
         await appendRow('Lancamentos', row);
