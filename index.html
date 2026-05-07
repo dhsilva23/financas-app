@@ -653,10 +653,11 @@ function renderHome() {
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
+  const faturaValStyle = ccPaga ? 'opacity:.45;text-decoration:line-through;' : '';
   document.getElementById('home-proj').innerHTML = `
     <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmt(projRec)}</div></div>
     <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGasto)}</div></div>
-    <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv ${ccPaga?'':'dn'}">${ccPaga?'—':'−'+fmt(ccFatura)}</div></div>
+    <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${faturaValStyle}">−${fmt(ccFatura)}</div></div>
     <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetadoColor}">${fmt(saldoProjetado)}</div></div>
   `;
 
