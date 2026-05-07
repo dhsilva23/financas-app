@@ -165,11 +165,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <div class="card" id="home-saldo-card">
           <div class="loading"><div class="spinner"></div>Carregando...</div>
         </div>
-        <div class="swc" id="home-swile-card" style="display:none;">
-          <div class="sl">Saldo Swile</div>
-          <div class="sv" id="home-swile-val">—</div>
-          <div class="sr" id="home-swile-sub">—</div>
-        </div>
+<!-- Swile card removed from home — see Swile tab -->
         <div class="sec-lbl">projeções</div>
         <div class="g2" id="home-proj">
           <div class="sc"><div class="sl">Carregando...</div><div class="sv">—</div></div>
@@ -585,8 +581,8 @@ function renderHome() {
   const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const projGasto = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
 
-  // CC fatura do mês
-  const ccFatura = ccData.filter(r=>(r[6]||'')===ml).reduce((s,r)=>s+parseVal(r[3]),0);
+  // CC fatura do mês - case insensitive match
+  const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml.toLowerCase()).reduce((s,r)=>s+parseVal(r[3]),0);
 
   const saldoColor = saldo >= 0 ? 'pos' : 'neg';
   document.getElementById('home-saldo-card').innerHTML = `
@@ -597,15 +593,7 @@ function renderHome() {
     <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
-  // Swile
-  const swileMonth = swileData.filter(r=>r[0]===ml);
-  const swileCredito = swileMonth.length ? parseVal(swileMonth[0][1]) : 0;
-  const swileUsado = swileData.filter(r=>r[4]&&(r[7]||'')==='Gasto').reduce((s,r)=>s+parseVal(r[6]),0);
-  if (swileCredito > 0) {
-    document.getElementById('home-swile-card').style.display='block';
-    document.getElementById('home-swile-val').textContent = fmt(swileCredito - swileUsado);
-    document.getElementById('home-swile-sub').textContent = `Crédito: ${fmt(swileCredito)} · Usado: ${fmt(swileUsado)}`;
-  }
+  // Swile removed from home — available in Swile tab
 
   // Projeções
   document.getElementById('home-proj').innerHTML = `
