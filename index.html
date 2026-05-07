@@ -1096,7 +1096,7 @@ function selPay(m, el) {
   payMethod = m;
   el.closest('.popts').querySelectorAll('.popt').forEach(p=>p.classList.remove('sel'));
   el.classList.add('sel');
-  document.getElementById('cc-fatura-sec').style.display = m==='CartaoC6'?'block':'none';
+  document.getElementById('cc-fatura-sec').style.display = (m==='CartaoC6')?'block':'none';
 }
 async function submitTx() {
   if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
@@ -1110,7 +1110,15 @@ async function submitTx() {
   const isProj = new Date(rawDate) > new Date() ? 'Sim' : 'Não';
   const obs = document.getElementById('inp-obs').value;
   const ml = MONTHS[parseInt(dateParts[1])-1] + ' ' + dateParts[0];
-  const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payMethod, isProj, ml, obs];
+  // Use display label for Meio column in sheet
+  const payLabels = {
+    'Pix':'Pix','Transferência':'Transferência','Débito':'Débito',
+    'Boleto (débito em conta)':'Boleto (débito em conta)','CartaoC6':'Cartão C6',
+    'Swile':'Swile','Crédito Swile':'Crédito Swile','Reembolso empresa':'Reembolso empresa',
+    'Dinheiro':'Dinheiro'
+  };
+  const payLabel = payLabels[payMethod] || payMethod;
+  const row = [dateFormatted, txType==='exp'?'Gasto':'Receita', desc, cat, rawVal, payLabel, isProj, ml, obs];
   
   // If CC, also add to Cartão C6 sheet
   let ccRow = null;
@@ -1144,7 +1152,7 @@ async function submitTx() {
       await updateRow(editingSheet || 'Lancamentos', editingRow, row);
       showToast('Lançamento atualizado! ✓');
     } else {
-      if (payMethod === 'Cartão C6') {
+      if (payMethod === 'CartaoC6') {
         // CC payments: only save to CartaoC6, NOT Lancamentos
         // They only affect the balance when the bill is paid
         if (ccRow) await appendRow('CartaoC6', ccRow);
