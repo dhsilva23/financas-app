@@ -170,7 +170,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <div class="g2" id="home-proj">
           <div class="sc"><div class="sl">Carregando...</div><div class="sv">—</div></div>
         </div>
-        <div class="sec-lbl">lançamentos recentes</div>
+        <div class="sec-lbl" id="home-txs-label">lançamentos do mês</div>
         <div class="txl" id="home-txs"><div class="loading"><div class="spinner"></div></div></div>
       </div>
     </div>
@@ -629,11 +629,20 @@ function renderHome() {
   // Swile removed from home — available in Swile tab
 
   // Projeções
+  // CC fatura: only deduct from projected balance if NOT paid yet
+  const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
+  const ccPaga = ccRows_month.length > 0 && ccRows_month.every(r=>(r[7]||'').toLowerCase()==='pago');
+  const ccFaturaDeducao = ccPaga ? 0 : ccFatura;
+  const saldoProjetado = saldo + projRec - projGasto - ccFaturaDeducao;
+  const saldoProjetadoColor = saldoProjetado >= 0 ? '' : 'dn';
+  const faturaLabel = ccPaga
+    ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
+    : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
   document.getElementById('home-proj').innerHTML = `
     <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmt(projRec)}</div></div>
     <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGasto)}</div></div>
-    <div class="sc"><div class="sl">Fatura C6 (${ml.split(' ')[0]})</div><div class="sv dn">−${fmt(ccFatura)}</div></div>
-    <div class="sc"><div class="sl">Saldo projetado</div><div class="sv">${fmt(saldo + projRec - projGasto - ccFatura)}</div></div>
+    <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv ${ccPaga?'':'dn'}">${ccPaga?'—':'−'+fmt(ccFatura)}</div></div>
+    <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetadoColor}">${fmt(saldoProjetado)}</div></div>
   `;
 
   // Reembolsos banner
@@ -655,10 +664,14 @@ function renderHome() {
     document.getElementById('reimb-banner-val').textContent = bannerText;
   } else { banner.style.display='none'; }
 
-  // Recent transactions
-  const recent = [...monthTx].reverse().slice(0,8);
-  document.getElementById('home-txs').innerHTML = recent.length
-    ? recent.map((r,i) => txRow(r, txData.indexOf(r), 'Lancamentos')).join('')
+  // All transactions of the month, sorted by date descending
+  const allMonthTx = [...monthTx].sort((a,b) => {
+    const toDate = s => { if(!s) return 0; const p=s.split('/'); return new Date(p[2],p[1]-1,p[0]); };
+    return toDate(b[0]) - toDate(a[0]);
+  });
+  document.getElementById('home-txs-label').textContent = `lançamentos do mês (${allMonthTx.length})`;
+  document.getElementById('home-txs').innerHTML = allMonthTx.length
+    ? allMonthTx.map((r) => txRow(r, txData.indexOf(r), 'Lancamentos')).join('')
     : '<div class="empty">Nenhum lançamento este mês</div>';
 }
 
