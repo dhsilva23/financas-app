@@ -285,9 +285,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
     <div class="screen" id="screen-add">
       <div class="hdr"><h1 id="add-title">Novo Lançamento</h1></div>
       <div class="sec" style="padding-top:14px;">
-        <div class="ttog">
+        <div class="ttog" style="grid-template-columns:1fr 1fr 1fr;">
           <button class="tbtn aexp" id="btn-exp" onclick="setType('exp')">↑ Gasto</button>
           <button class="tbtn" id="btn-inc" onclick="setType('inc')">↓ Receita</button>
+          <button class="tbtn" id="btn-trf" onclick="setType('trf')" style="font-size:11px;">⇄ Transferência</button>
         </div>
         <div class="step active" id="step1">
           <div class="fg">
@@ -304,6 +305,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
               <option>Despesa Reembolsável</option>
               <option>A Receber (Pessoa)</option><option>Investimentos/Poupança</option><option>Pagamento Fatura C6</option><option>Outros</option>
             </select>
+          </div>
+          <div class="fg" id="fg-conta"><label>Conta</label>
+            <select id="inp-conta" onchange="checkContaFields()">
+              <option value="C6">💚 C6 (principal)</option>
+              <option value="Caixa">🏦 Caixa</option>
+              <option value="USD">🇺🇸 C6 USD</option>
+              <option value="EUR">🇪🇺 C6 EUR</option>
+            </select>
+          </div>
+          <!-- Transfer destination (only for Transferência type) -->
+          <div class="fg" id="fg-conta-dest" style="display:none;"><label>Para qual conta</label>
+            <select id="inp-conta-dest">
+              <option value="Caixa">🏦 Caixa</option>
+              <option value="C6">💚 C6 (principal)</option>
+              <option value="USD">🇺🇸 C6 USD</option>
+              <option value="EUR">🇪🇺 C6 EUR</option>
+            </select>
+          </div>
+          <!-- FX fields (only for USD/EUR accounts) -->
+          <div id="fg-fx-fields" style="display:none;">
+            <div class="fg"><label id="lbl-fx-val">Valor em USD</label>
+              <input type="text" inputmode="decimal" id="inp-fx-val" placeholder="0,00" oninput="maskCurrency(this)">
+            </div>
+            <div class="fg"><label>Taxa de câmbio (R$ por 1 USD/EUR)</label>
+              <input type="text" inputmode="decimal" id="inp-taxa" placeholder="Ex: 5,85" oninput="maskCurrency(this)">
+            </div>
           </div>
           <div class="fg"><label>Data <span style="font-size:10px;color:var(--text3);">(futura = projeção automática)</span></label><input type="date" id="inp-date"></div>
           <div class="fg"><label>Observação (opcional)</label><input type="text" id="inp-obs" placeholder="Ex: parcela 1/3, reembolso pendente..."></div>
@@ -435,6 +462,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyFgaTu-X51Qb2LEc3W5
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 let curM = 4, curY = 2026, catM = 4, catY = 2026;
 let txData = [], ccData = [], swileData = [], reimbData = [], poupData = [], metasData = [];
+let caixaData = [], usdData = [], eurData = [];
 let editingRow = null; // row index (1-based in sheet)
 let editingSheet = null;
 let selectedTx = null;
@@ -483,6 +511,32 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function curMonthLabel() { return MONTHS[curM] + ' ' + curY; }
+
+// Calculate Caixa balance from ContaCaixa data
+function calcContaSaldo(data) {
+  return data.reduce((s, r) => {
+    const tipo = (r[2]||'').toLowerCase();
+    const val = parseVal(r[3]);
+    if (tipo === 'entrada' || tipo === 'receita' || tipo === 'transferência recebida') return s + val;
+    if (tipo === 'saída' || tipo === 'gasto' || tipo === 'transferência enviada') return s - val;
+    return s;
+  }, 0);
+}
+
+// Calculate FX account balance and BRL equivalent
+function calcFxSaldo(data) {
+  let saldoFx = 0;
+  let lastRate = 0;
+  data.forEach(r => {
+    const tipo = (r[2]||'').toLowerCase();
+    const valFx = parseVal(r[3]);
+    const taxa = parseVal(r[4]);
+    if (taxa > 0) lastRate = taxa;
+    if (tipo === 'entrada' || tipo === 'compra') saldoFx += valFx;
+    else if (tipo === 'saída' || tipo === 'gasto') saldoFx -= valFx;
+  });
+  return { saldo: saldoFx * lastRate, saldoFx, lastRate };
+}
 
 // Currency mask: keeps Brazilian format while typing
 function maskCurrency(el) {
@@ -581,15 +635,19 @@ async function clearRow(sheet, rowNum) {
 // ── LOAD DATA ────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [tx, cc, sw, rb, pp, mt] = await Promise.all([
+    const [tx, cc, sw, rb, pp, mt, caixa, usd, eur] = await Promise.all([
       getRange('Lancamentos!A2:I500'),
       getRange('CartaoC6!A2:I500'),
       getRange('Swile!A2:H200'),
       getRange('Reembolsos!A2:J200'),
       getRange('Poupanca!A2:F50'),
-      getRange('Metas!A3:C10')
+      getRange('Metas!A3:C10'),
+      getRange('ContaCaixa!A2:E500'),
+      getRange('ContaUSD!A2:G500'),
+      getRange('ContaEUR!A2:G500')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
+    caixaData = caixa; usdData = usd; eurData = eur;
 
 
     // Only render currently visible screen
@@ -611,10 +669,16 @@ function renderHome() {
   const ml = curMonthLabel();
   const ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
-  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
-  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile' && r[1]!=='Transferência').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && r[1]!=='Transferência').reduce((s,r)=>s+parseVal(r[4]),0);
+  // Caixa balance
+  const caixaSaldo = calcContaSaldo(caixaData);
+  // USD/EUR converted to BRL using last known rate
+  const {saldo: usdSaldoBRL} = calcFxSaldo(usdData);
+  const {saldo: eurSaldoBRL} = calcFxSaldo(eurData);
   const saldoInicial = calcSaldoInicial();
-  const saldo = saldoInicial + receitas - gastos;
+  const saldoC6 = saldoInicial + receitas - gastos;
+  const saldo = saldoC6 + caixaSaldo; // total BRL (C6 + Caixa)
   const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   // Add pending reembolsos estimated for this month
   const projRec_reimb = reimbData.filter(r=>{
@@ -633,12 +697,18 @@ function renderHome() {
   const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml.toLowerCase()).reduce((s,r)=>s+parseVal(r[3]),0);
 
   const saldoColor = saldo >= 0 ? 'pos' : 'neg';
+  const hasFx = usdSaldoBRL > 0 || eurSaldoBRL > 0;
   document.getElementById('home-saldo-card').innerHTML = `
-    <div class="row"><span class="lbl">Saldo atual</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
+    <div class="row"><span class="lbl">Saldo total</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
     <hr class="div">
-    <div class="row"><span class="lbl">Saldo inicial do mês</span><span class="val">${fmt(saldoInicial)}</span></div>
-    <div class="row"><span class="lbl">↓ Receitas realizadas</span><span class="val pos">+${fmt(receitas)}</span></div>
-    <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
+    <div class="row"><span class="lbl">💚 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
+    ${caixaSaldo !== 0 ? `<div class="row"><span class="lbl">🏦 Caixa</span><span class="val">${fmt(caixaSaldo)}</span></div>` : ''}
+    ${hasFx ? `<hr class="div"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Moeda estrangeira (convertida)</div>` : ''}
+    ${usdSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇺🇸 USD → R$</span><span class="val">${fmt(usdSaldoBRL)}</span></div>` : ''}
+    ${eurSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇪🇺 EUR → R$</span><span class="val">${fmt(eurSaldoBRL)}</span></div>` : ''}
+    <hr class="div">
+    <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitas)}</span></div>
+    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
   // Swile removed from home — available in Swile tab
@@ -1073,46 +1143,78 @@ function renderCats() {
 
 // ── SAÚDE FINANCEIRA ─────────────────────────────────────
 function renderHealth() {
-  const lastPoup = poupData.filter(r=>r[1]).pop();
+  const lastPoup = poupData.filter(r=>r[0]&&r[1]).pop();
   const poupSaldo = lastPoup ? parseVal(lastPoup[1]) : 0;
-  const metaReserva = metasData.find(r=>r[0]&&r[0].includes('emergência'));
-  const metaPoup = metasData.find(r=>r[0]&&r[0].includes('poupança 2026'));
-  const reservaMeta = metaReserva ? parseVal(metaReserva[1]) : 59000;
-  const poupMeta = metaPoup ? parseVal(metaPoup[1]) : 25000;
-  const pendentes = reimbData.filter(r=>(r[4]||'')==='Pendente');
+  const lastPoupAporte = lastPoup ? parseVal(lastPoup[2]) : 0;
+
+  const metaReserva = metasData.find(r=>r[0]&&r[0].toLowerCase().includes('emergência'));
+  const metaPoup2026 = metasData.find(r=>r[0]&&r[0].toLowerCase().includes('poupança 2026'));
+  const metaAporte = metasData.find(r=>r[0]&&r[0].toLowerCase().includes('aporte mensal'));
+  const metaComprometimento = metasData.find(r=>r[0]&&r[0].toLowerCase().includes('comprometimento mensal'));
+  const reservaMeta = metaReserva ? parseVal(metaReserva[1]) : 32461.62;
+  const poupMeta = metaPoup2026 ? parseVal(metaPoup2026[1]) : 25000;
+  const aporteMeta = metaAporte ? parseVal(metaAporte[1]) : 5000;
+  const comprometimentoMeta = metaComprometimento ? parseVal(metaComprometimento[1]) : 7000;
+
+  const ml_h = curMonthLabel().toLowerCase();
+  const monthTxH = txData.filter(r=>(r[7]||'').toLowerCase()===ml_h);
+  const gastosReais = monthTxH.filter(r=>r[1]==='Gasto'&&r[6]!=='Sim'&&r[5]!=='Swile'&&r[3]!=='Pagamento Fatura C6').reduce((s,r)=>s+parseVal(r[4]),0);
+  const pendentes = reimbData.filter(r=>(r[4]||'').toLowerCase()==='pendente');
   const totalPend = pendentes.reduce((s,r)=>s+parseVal(r[2]),0);
-  const reservaMeses = reservaMeta>0?(poupSaldo/reservaMeta*6).toFixed(1):0;
+  const reservaMeses = reservaMeta>0?(poupSaldo/reservaMeta*6):0;
+  const aporteOk = lastPoupAporte >= aporteMeta;
+  const comprometOk = gastosReais <= comprometimentoMeta;
+
+  let score = 55;
+  if (aporteOk) score += 20;
+  if (comprometOk) score += 15;
+  if (reservaMeses >= 3) score += 10;
+  score = Math.min(score, 100);
+  const scoreColor = score>=75?'var(--green-d)':score>=50?'#8A5800':'#993C1D';
+  const scoreBg = score>=75?'var(--green-l)':score>=50?'var(--yellow-l)':'var(--red-l)';
+  const scoreLabel = score>=75?'Boa saúde financeira':score>=50?'Saúde financeira ok':'Atenção necessária';
+
   document.getElementById('health-score').innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;">
-      <div style="width:68px;height:68px;border-radius:50%;background:var(--green-l);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--green-d);flex-shrink:0;">78</div>
-      <div><div style="font-size:16px;font-weight:600;margin-bottom:3px;">Boa saúde financeira</div><div style="font-size:12px;color:var(--text3);">Baseado em indicadores do mês</div></div>
+      <div style="width:68px;height:68px;border-radius:50%;background:${scoreBg};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:${scoreColor};flex-shrink:0;">${score}</div>
+      <div><div style="font-size:16px;font-weight:600;margin-bottom:3px;">${scoreLabel}</div><div style="font-size:12px;color:var(--text3);">Baseado em ${curMonthLabel()}</div></div>
     </div>`;
+
   document.getElementById('health-kpis').innerHTML = `
-    <div class="sc"><div class="sl">Taxa de poupança</div><div class="sv up">14,3%</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: 20% ↑</div></div>
-    <div class="sc"><div class="sl">Comprometimento</div><div class="sv dn">71,7%</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Ideal: <70%</div></div>
-    <div class="sc"><div class="sl">Reserva emergência</div><div class="sv up">${reservaMeses} meses</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: 6 meses</div></div>
-    <div class="sc"><div class="sl">Poupança atual</div><div class="sv up">${fmt(poupSaldo)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: ${fmt(poupMeta)}</div></div>
+    <div class="sc"><div class="sl">Gastos do mês</div><div class="sv ${comprometOk?'up':'dn'}">${fmt(gastosReais)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: até ${fmt(comprometimentoMeta)} ${comprometOk?'✓':'⚠️'}</div></div>
+    <div class="sc"><div class="sl">Aporte poupança</div><div class="sv ${aporteOk?'up':'wn'}">${fmt(lastPoupAporte)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: ${fmt(aporteMeta)}/mês ${aporteOk?'✓':'⚠️'}</div></div>
+    <div class="sc"><div class="sl">Reserva emergência</div><div class="sv ${reservaMeses>=3?'up':'wn'}">${reservaMeses.toFixed(1)} meses</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: 6 meses</div></div>
+    <div class="sc"><div class="sl">Poupança total</div><div class="sv up">${fmt(poupSaldo)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta 2026: ${fmt(poupMeta)}</div></div>
     <div class="sc"><div class="sl">Reembolsos pend.</div><div class="sv wn">${fmt(totalPend)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">${pendentes.length} item(s)</div></div>
   `;
-  document.getElementById('health-insights').innerHTML = `
-    <div class="insight"><span class="insight-ico">⚠️</span><div class="insight-txt"><strong>Comprometimento de renda alto.</strong> 71,7% dos gastos são fixos. Reduzir para abaixo de 70% daria mais fôlego mensal.</div></div>
-    <div class="insight"><span class="insight-ico">🎯</span><div class="insight-txt"><strong>Reserva de emergência em construção.</strong> Meta: 6 meses de gastos (~${fmt(reservaMeta)}). Continue aportando!</div></div>
-    ${totalPend>0?`<div class="insight"><span class="insight-ico">💼</span><div class="insight-txt"><strong>${fmt(totalPend)} para cobrar da empresa.</strong> ${pendentes.length} reembolso(s) pendente(s).</div></div>`:''}
-    <div class="insight"><span class="insight-ico">✅</span><div class="insight-txt"><strong>Poupança crescendo consistentemente.</strong> Se mantiver o ritmo, você atinge a meta em 2026.</div></div>
-  `;
-  const poupPct = poupMeta>0?Math.round(poupSaldo/poupMeta*100):0;
-  const resPct = Math.round(poupSaldo/reservaMeta*100);
+
+  const insights = [];
+  if (!comprometOk) insights.push(`<div class="insight"><span class="insight-ico">⚠️</span><div class="insight-txt"><strong>Gastos acima da meta.</strong> ${fmt(gastosReais)} — ${fmt(gastosReais-comprometimentoMeta)} acima do limite de ${fmt(comprometimentoMeta)}.</div></div>`);
+  else insights.push(`<div class="insight"><span class="insight-ico">✅</span><div class="insight-txt"><strong>Gastos dentro da meta!</strong> ${fmt(gastosReais)} de ${fmt(comprometimentoMeta)} — ${fmt(comprometimentoMeta-gastosReais)} de margem.</div></div>`);
+  if (!aporteOk) insights.push(`<div class="insight"><span class="insight-ico">🎯</span><div class="insight-txt"><strong>Aporte abaixo da meta.</strong> Meta: ${fmt(aporteMeta)}/mês. Atualize a poupança ao fechar o mês.</div></div>`);
+  else insights.push(`<div class="insight"><span class="insight-ico">✅</span><div class="insight-txt"><strong>Aporte na poupança em dia!</strong> ${fmt(lastPoupAporte)} aportado este mês.</div></div>`);
+  if (reservaMeses < 3) insights.push(`<div class="insight"><span class="insight-ico">⚠️</span><div class="insight-txt"><strong>Reserva de emergência baixa.</strong> ${reservaMeses.toFixed(1)} meses cobertos. Meta: 6 meses (${fmt(reservaMeta)}).</div></div>`);
+  else insights.push(`<div class="insight"><span class="insight-ico">🛡️</span><div class="insight-txt"><strong>Reserva crescendo bem.</strong> ${reservaMeses.toFixed(1)} de 6 meses cobertos.</div></div>`);
+  if (totalPend>0) insights.push(`<div class="insight"><span class="insight-ico">💼</span><div class="insight-txt"><strong>${fmt(totalPend)} para cobrar.</strong> ${pendentes.length} reembolso(s) pendente(s).</div></div>`);
+  document.getElementById('health-insights').innerHTML = insights.join('');
+
+  const poupPct = poupMeta>0?Math.min(Math.round(poupSaldo/poupMeta*100),100):0;
+  const resPct = Math.min(Math.round(poupSaldo/reservaMeta*100),100);
+  const comprometPct = Math.min(Math.round(gastosReais/comprometimentoMeta*100),100);
   document.getElementById('health-metas').innerHTML = `
     <div class="row"><span class="lbl">Meta poupança 2026</span><span class="val" style="font-size:12px;">${fmt(poupSaldo)} / ${fmt(poupMeta)}</span></div>
     <div class="pw"><div class="pf" style="width:${poupPct}%;background:var(--green);"></div></div>
-    <div style="font-size:10px;color:var(--text3);">${poupPct}% — ${poupPct>=100?'Meta atingida! 🎉':'no caminho certo ✓'}</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${poupPct}% ${poupPct>=100?'— Meta atingida! 🎉':'— no caminho certo ✓'}</div>
     <hr class="div">
     <div class="row"><span class="lbl">Reserva de emergência</span><span class="val" style="font-size:12px;">${fmt(poupSaldo)} / ${fmt(reservaMeta)}</span></div>
-    <div class="pw"><div class="pf" style="width:${Math.min(resPct,100)}%;background:#EF9F27;"></div></div>
-    <div style="font-size:10px;color:var(--text3);">${resPct}% — 6 meses de gastos fixos</div>
+    <div class="pw"><div class="pf" style="width:${resPct}%;background:#EF9F27;"></div></div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${resPct}% — 6 meses de gastos fixos</div>
+    <hr class="div">
+    <div class="row"><span class="lbl">Gastos do mês</span><span class="val" style="font-size:12px;">${fmt(gastosReais)} / ${fmt(comprometimentoMeta)}</span></div>
+    <div class="pw"><div class="pf" style="width:${comprometPct}%;background:${comprometOk?'var(--green)':'var(--red)'};"></div></div>
+    <div style="font-size:10px;color:var(--text3);">${comprometPct}% da meta mensal ${comprometOk?'✓':'— acima do limite ⚠️'}</div>
   `;
 }
-
 // ── POUPANÇA ─────────────────────────────────────────────
 function renderPoup() {
   const valid = poupData.filter(r=>r[0]&&r[1]);
@@ -1205,14 +1307,41 @@ function resetAddForm() {
   if (recMeses) recMeses.style.display = 'none';
   const recCustom = document.getElementById('inp-recorrente-custom');
   if (recCustom) { recCustom.value = ''; recCustom.style.display = 'none'; }
+  // Reset account fields
+  const contaSel = document.getElementById('inp-conta');
+  if (contaSel) contaSel.value = 'C6';
+  const contaDest = document.getElementById('fg-conta-dest');
+  if (contaDest) contaDest.style.display = 'none';
+  const fxFields = document.getElementById('fg-fx-fields');
+  if (fxFields) fxFields.style.display = 'none';
+  const fxVal = document.getElementById('inp-fx-val');
+  if (fxVal) fxVal.value = '';
+  const taxa = document.getElementById('inp-taxa');
+  if (taxa) taxa.value = '';
   goStep1();
 }
 function setType(t) {
   txType = t;
   document.getElementById('btn-exp').className = 'tbtn' + (t==='exp'?' aexp':'');
   document.getElementById('btn-inc').className = 'tbtn' + (t==='inc'?' ainc':'');
-  document.getElementById('fg-cat').style.display = t==='inc'?'none':'block';
+  document.getElementById('btn-trf').className = 'tbtn' + (t==='trf'?' aexp':'');
+  document.getElementById('fg-cat').style.display = (t==='inc'||t==='trf')?'none':'block';
+  document.getElementById('fg-conta-dest').style.display = t==='trf'?'block':'none';
+  // For transfers, hide payment step — go directly
+  if (t==='trf') {
+    document.getElementById('fg-reimb-fields').style.display='none';
+  }
   checkReimbField();
+  checkContaFields();
+}
+
+function checkContaFields() {
+  const conta = document.getElementById('inp-conta')?.value || 'C6';
+  const isFx = conta === 'USD' || conta === 'EUR';
+  const fxFields = document.getElementById('fg-fx-fields');
+  const lblFx = document.getElementById('lbl-fx-val');
+  if (fxFields) fxFields.style.display = isFx ? 'block' : 'none';
+  if (lblFx) lblFx.textContent = `Valor em ${conta}`;
 }
 function toggleRecorrente() {
   const checked = document.getElementById('inp-recorrente').checked;
@@ -1248,6 +1377,11 @@ function goStep2() {
   const v = document.getElementById('inp-val').value;
   const d = document.getElementById('inp-desc').value;
   if (!v || !d) { showToast('Preencha o valor e a descrição.'); return; }
+  const conta = document.getElementById('inp-conta')?.value || 'C6';
+  if (txType === 'trf' || conta === 'Caixa' || conta === 'USD' || conta === 'EUR') {
+    submitTx();
+    return;
+  }
   document.getElementById('step1').classList.remove('active');
   document.getElementById('step2').classList.add('active');
   const isProj = new Date(document.getElementById('inp-date').value) > new Date();
@@ -1295,9 +1429,9 @@ function pagarFatura() {
 }
 
 async function submitTx() {
-  if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
+  const conta = document.getElementById('inp-conta')?.value || 'C6';
   const rawVal = parseVal(document.getElementById('inp-val').value);
-  const val = rawVal; // send as number, not string
+  const val = rawVal;
   const desc = document.getElementById('inp-desc').value;
   const cat = txType==='exp' ? document.getElementById('inp-cat').value : '';
   const rawDate = document.getElementById('inp-date').value;
@@ -1306,6 +1440,67 @@ async function submitTx() {
   const isProj = new Date(rawDate) > new Date() ? 'Sim' : 'Não';
   const obs = document.getElementById('inp-obs').value;
   const ml = MONTHS[parseInt(dateParts[1])-1] + ' ' + dateParts[0];
+
+  // Handle TRANSFER between accounts
+  if (txType === 'trf') {
+    const contaDest = document.getElementById('inp-conta-dest')?.value || 'Caixa';
+    if (!rawVal || !desc) { showToast('Preencha o valor e a descrição.'); return; }
+    showToast('Salvando transferência...');
+    try {
+      // Debit from source account
+      if (conta === 'C6') {
+        await appendRow('Lancamentos', [dateFormatted,'Transferência',desc,'Transferência entre contas',rawVal,'Transferência','Não',ml,`→ ${contaDest}`]);
+      } else if (conta === 'Caixa') {
+        await appendRow('ContaCaixa', [dateFormatted, desc, 'Transferência Enviada', rawVal, '']);
+      }
+      // Credit to destination account
+      if (contaDest === 'Caixa') {
+        await appendRow('ContaCaixa', [dateFormatted, desc, 'Transferência Recebida', rawVal, '']);
+      } else if (contaDest === 'C6') {
+        await appendRow('Lancamentos', [dateFormatted,'Receita',desc,'Transferência entre contas',rawVal,'Transferência','Não',ml,`← ${conta}`]);
+      }
+      await loadAll(); resetAddForm(); goTo('home');
+      showToast('Transferência registrada! ✓');
+    } catch(e) { showToast('Erro ao salvar.'); }
+    return;
+  }
+
+  // Handle FX account (USD/EUR) transactions
+  if (conta === 'USD' || conta === 'EUR') {
+    const fxVal = parseVal(document.getElementById('inp-fx-val')?.value || '0');
+    const taxa = parseVal(document.getElementById('inp-taxa')?.value || '0');
+    const valBRL = fxVal * taxa;
+    if (!fxVal || !taxa) { showToast('Preencha o valor e a taxa de câmbio.'); return; }
+    const sheet = conta === 'USD' ? 'ContaUSD' : 'ContaEUR';
+    const tipo = txType === 'exp' ? 'Saída' : 'Entrada';
+    showToast('Salvando...');
+    try {
+      await appendRow(sheet, [dateFormatted, desc, tipo, fxVal, taxa, valBRL, '']);
+      // If buying FX (entry), debit BRL from C6
+      if (txType === 'inc') {
+        await appendRow('Lancamentos', [dateFormatted,'Gasto',`Compra ${conta} — ${desc}`,'Investimentos/Poupança',rawVal,'Pix','Não',ml,obs]);
+      }
+      await loadAll(); resetAddForm(); goTo('home');
+      showToast(`Lançamento ${conta} registrado! ✓`);
+    } catch(e) { showToast('Erro ao salvar.'); }
+    return;
+  }
+
+  // Handle Caixa transactions
+  if (conta === 'Caixa') {
+    if (!rawVal || !desc) { showToast('Preencha o valor e a descrição.'); return; }
+    showToast('Salvando...');
+    try {
+      const tipo = txType === 'exp' ? 'Saída' : 'Entrada';
+      await appendRow('ContaCaixa', [dateFormatted, desc, tipo, rawVal, '']);
+      await loadAll(); resetAddForm(); goTo('home');
+      showToast('Lançamento Caixa registrado! ✓');
+    } catch(e) { showToast('Erro ao salvar.'); }
+    return;
+  }
+
+  // C6 normal flow continues below...
+  if (!payMethod) { showToast('Selecione o meio de pagamento.'); return; }
   // Use display label for Meio column in sheet
   const payLabels = {
     'Pix':'Pix','Transferência':'Transferência','Débito':'Débito',
