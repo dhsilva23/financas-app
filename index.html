@@ -571,7 +571,7 @@ function calcSaldoInicial() {
     const key = parseInt(parts[1])*12 + monthIdx;
     if (key < curKey && r[6] !== 'Sim') {
       if (r[1]==='Receita' && r[5]!=='Crédito Swile') saldoAnterior += parseVal(r[4]);
-      else if (r[1]==='Gasto' && r[5]!=='Swile' && !(r[3]||'').startsWith('Transferência entre conta')) saldoAnterior -= parseVal(r[4]);
+      else if (r[1]==='Gasto' && r[5]!=='Swile') saldoAnterior -= parseVal(r[4]);
     }
   });
   return saldoAnterior;
@@ -673,7 +673,8 @@ function renderHome() {
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
   // Receitas e gastos do C6 — exclui Swile
   const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
-  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && !(r[3]||'').startsWith('Transferência entre conta')).reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastosDisplay = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && !(r[3]||'').startsWith('Transferência entre conta')).reduce((s,r)=>s+parseVal(r[4]),0);
   // Caixa balance
   const caixaSaldo = calcContaSaldo(caixaData);
   // USD/EUR converted to BRL using last known rate
@@ -705,7 +706,7 @@ function renderHome() {
     return estMonth.toLowerCase() === ml_lower;
   }).reduce((s,r)=>s+parseVal(r[2]),0);
   const projRec = projRec_tx + projRec_reimb;
-  const projGastoTx = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim' && !(r[3]||'').startsWith('Transferência entre conta')).reduce((s,r)=>s+parseVal(r[4]),0);
+  const projGastoTx = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   // Include unpaid CC fatura for this month in projected gastos
   const projGasto = projGastoTx + ccFaturaProj;
 
@@ -726,7 +727,7 @@ function renderHome() {
     ${eurSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇪🇺 EUR → R$</span><span class="val">${fmt(eurSaldoBRL)}</span></div>` : ''}
     <hr class="div">
     <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitas)}</span></div>
-    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastos)}</span></div>
+    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastosDisplay)}</span></div>
   `;
 
   // Swile removed from home — available in Swile tab
