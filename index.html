@@ -701,7 +701,7 @@ function renderHome() {
   document.getElementById('home-saldo-card').innerHTML = `
     <div class="row"><span class="lbl">Saldo total</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
     <hr class="div">
-    <div class="row"><span class="lbl">💚 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
+    <div class="row"><span class="lbl">🖤 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
     ${caixaSaldo !== 0 ? `<div class="row"><span class="lbl">🏦 Caixa</span><span class="val">${fmt(caixaSaldo)}</span></div>` : ''}
     ${hasFx ? `<hr class="div"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Moeda estrangeira (convertida)</div>` : ''}
     ${usdSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇺🇸 USD → R$</span><span class="val">${fmt(usdSaldoBRL)}</span></div>` : ''}
