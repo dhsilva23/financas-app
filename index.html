@@ -308,7 +308,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           </div>
           <div class="fg" id="fg-conta"><label>Conta</label>
             <select id="inp-conta" onchange="checkContaFields()">
-              <option value="C6">🖤 C6 (principal)</option>
+              <option value="C6">💚 C6 (principal)</option>
               <option value="Caixa">🏦 Caixa</option>
               <option value="USD">🇺🇸 C6 USD</option>
               <option value="EUR">🇪🇺 C6 EUR</option>
@@ -318,7 +318,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
           <div class="fg" id="fg-conta-dest" style="display:none;"><label>Para qual conta</label>
             <select id="inp-conta-dest">
               <option value="Caixa">🏦 Caixa</option>
-              <option value="C6">🖤 C6 (principal)</option>
+              <option value="C6">💚 C6 (principal)</option>
               <option value="USD">🇺🇸 C6 USD</option>
               <option value="EUR">🇪🇺 C6 EUR</option>
             </select>
@@ -669,8 +669,12 @@ function renderHome() {
   const ml = curMonthLabel();
   const ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
-  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile' && r[1]!=='Transferência').reduce((s,r)=>s+parseVal(r[4]),0);
-  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && r[1]!=='Transferência').reduce((s,r)=>s+parseVal(r[4]),0);
+  // For saldo: include everything including transfers
+  const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  // For display only: exclude transfers and bill payments
+  const receitasDisplay = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile' && r[3]!=='Transferência entre contas').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastosDisplay = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && r[3]!=='Transferência entre contas' && r[3]!=='Pagamento Fatura C6').reduce((s,r)=>s+parseVal(r[4]),0);
   // Caixa balance
   const caixaSaldo = calcContaSaldo(caixaData);
   // USD/EUR converted to BRL using last known rate
@@ -680,6 +684,8 @@ function renderHome() {
   const saldoC6 = saldoInicial + receitas - gastos;
   const saldo = saldoC6 + caixaSaldo; // total BRL (C6 + Caixa)
   const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  // Add unpaid CC fatura to projected gastos
+  const ccFaturaProj = !ccPaga ? ccFatura : 0;
   // Add pending reembolsos estimated for this month
   const projRec_reimb = reimbData.filter(r=>{
     if ((r[4]||'').toLowerCase() !== 'pendente') return false;
@@ -691,7 +697,8 @@ function renderHome() {
     return estMonth.toLowerCase() === ml_lower;
   }).reduce((s,r)=>s+parseVal(r[2]),0);
   const projRec = projRec_tx + projRec_reimb;
-  const projGasto = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const projGastoTx = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const projGasto = projGastoTx + ccFaturaProj;
 
   // CC fatura do mês - case insensitive match
   const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml.toLowerCase()).reduce((s,r)=>s+parseVal(r[3]),0);
@@ -701,14 +708,14 @@ function renderHome() {
   document.getElementById('home-saldo-card').innerHTML = `
     <div class="row"><span class="lbl">Saldo total</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
     <hr class="div">
-    <div class="row"><span class="lbl">🖤 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
+    <div class="row"><span class="lbl">💚 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
     ${caixaSaldo !== 0 ? `<div class="row"><span class="lbl">🏦 Caixa</span><span class="val">${fmt(caixaSaldo)}</span></div>` : ''}
     ${hasFx ? `<hr class="div"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Moeda estrangeira (convertida)</div>` : ''}
     ${usdSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇺🇸 USD → R$</span><span class="val">${fmt(usdSaldoBRL)}</span></div>` : ''}
     ${eurSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇪🇺 EUR → R$</span><span class="val">${fmt(eurSaldoBRL)}</span></div>` : ''}
     <hr class="div">
-    <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitas)}</span></div>
-    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastos)}</span></div>
+    <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitasDisplay)}</span></div>
+    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastosDisplay)}</span></div>
   `;
 
   // Swile removed from home — available in Swile tab
@@ -716,17 +723,19 @@ function renderHome() {
   // Projeções
   // CC fatura: only deduct from projected balance if NOT paid yet
   const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
-  const ccPaga = ccRows_month.length > 0 && ccRows_month.every(r=>(r[7]||'').toLowerCase()==='pago');
-  const ccFaturaDeducao = ccPaga ? 0 : ccFatura;
-  const saldoProjetado = saldo + projRec - projGasto - ccFaturaDeducao;
+  // Filter out empty rows before checking paid status
+  const ccRows_valid = ccRows_month.filter(r=>r[1]||(r[3]&&parseVal(r[3])>0));
+  const ccPaga = ccRows_valid.length > 0 && ccRows_valid.every(r=>(r[7]||'').toLowerCase()==='pago');
+  // ccFatura already included in projGasto when unpaid
+  const saldoProjetado = saldo + projRec - projGasto;
   const saldoProjetadoColor = saldoProjetado >= 0 ? '' : 'dn';
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
-    : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
+    : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto — inclusa nos gastos</span>`;
   const faturaValStyle = ccPaga ? 'opacity:.45;text-decoration:line-through;' : '';
   document.getElementById('home-proj').innerHTML = `
     <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmt(projRec)}</div></div>
-    <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGasto)}</div></div>
+    <div class="sc"><div class="sl">Gastos previstos ${!ccPaga?'<span style=\'font-size:9px;color:var(--red);\'>incl. fatura C6</span>':''}</div><div class="sv dn">−${fmt(projGasto)}</div></div>
     <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${faturaValStyle}">−${fmt(ccFatura)}</div></div>
     <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetadoColor}">${fmt(saldoProjetado)}</div></div>
   `;
