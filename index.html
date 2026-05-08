@@ -671,12 +671,9 @@ function renderHome() {
   const ml = curMonthLabel();
   const ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
-  // For saldo: include everything including transfers
+  // Receitas e gastos realizados — inclui tudo exceto Swile (conta separada)
   const receitas = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
   const gastos = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile').reduce((s,r)=>s+parseVal(r[4]),0);
-  // For display only: exclude transfers and bill payments
-  const receitasDisplay = monthTx.filter(r => r[1]==='Receita' && r[6]!=='Sim' && r[5]!=='Crédito Swile' && r[3]!=='Transferência entre contas').reduce((s,r)=>s+parseVal(r[4]),0);
-  const gastosDisplay = monthTx.filter(r => r[1]==='Gasto' && r[6]!=='Sim' && r[5]!=='Swile' && r[3]!=='Transferência entre contas' && r[3]!=='Pagamento Fatura C6').reduce((s,r)=>s+parseVal(r[4]),0);
   // Caixa balance
   const caixaSaldo = calcContaSaldo(caixaData);
   // USD/EUR converted to BRL using last known rate
@@ -729,8 +726,8 @@ function renderHome() {
     ${usdSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇺🇸 USD → R$</span><span class="val">${fmt(usdSaldoBRL)}</span></div>` : ''}
     ${eurSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇪🇺 EUR → R$</span><span class="val">${fmt(eurSaldoBRL)}</span></div>` : ''}
     <hr class="div">
-    <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitasDisplay)}</span></div>
-    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastosDisplay)}</span></div>
+    <div class="row"><span class="lbl">↓ Receitas realizadas (C6)</span><span class="val pos">+${fmt(receitas)}</span></div>
+    <div class="row"><span class="lbl">↑ Gastos realizados (C6)</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
   // Swile removed from home — available in Swile tab
