@@ -635,16 +635,18 @@ async function clearRow(sheet, rowNum) {
 // ── LOAD DATA ────────────────────────────────────────────
 async function loadAll() {
   try {
+    // Load core sheets — fail-safe: each sheet loads independently
+    const safeGet = async (range) => { try { return await getRange(range); } catch(e) { console.warn('Failed:', range); return []; }};
     const [tx, cc, sw, rb, pp, mt, caixa, usd, eur] = await Promise.all([
-      getRange('Lancamentos!A2:I500'),
-      getRange('CartaoC6!A2:I500'),
-      getRange('Swile!A2:H200'),
-      getRange('Reembolsos!A2:J200'),
-      getRange('Poupanca!A2:F50'),
-      getRange('Metas!A3:C10'),
-      getRange('ContaCaixa!A2:E500'),
-      getRange('ContaUSD!A2:G500'),
-      getRange('ContaEUR!A2:G500')
+      safeGet('Lancamentos!A2:I500'),
+      safeGet('CartaoC6!A2:I500'),
+      safeGet('Swile!A2:H200'),
+      safeGet('Reembolsos!A2:J200'),
+      safeGet('Poupanca!A2:F50'),
+      safeGet('Metas!A3:C10'),
+      safeGet('ContaCaixa!A2:E500'),
+      safeGet('ContaUSD!A2:G500'),
+      safeGet('ContaEUR!A2:G500')
     ]);
     txData = tx; ccData = cc; swileData = sw; reimbData = rb; poupData = pp; metasData = mt;
     caixaData = caixa; usdData = usd; eurData = eur;
