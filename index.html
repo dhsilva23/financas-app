@@ -685,12 +685,14 @@ function renderHome() {
   const saldoInicial = calcSaldoInicial();
   const saldoC6 = saldoInicial + receitas - gastos;
   const saldo = saldoC6 + caixaSaldo; // total BRL (C6 + Caixa)
-  // CC fatura status (needed for projections)
+  // CC fatura status for current viewed month
   const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
   const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
   const ccRows_valid = ccRows_month.filter(r=>r[1]||(r[3]&&parseVal(r[3])>0));
   const ccPaga = ccRows_valid.length > 0 && ccRows_valid.every(r=>(r[7]||'').toLowerCase()==='pago');
-  const ccFaturaProj = !ccPaga ? ccFatura : 0;
+  // For future months: fatura is never paid yet, so always include in projections
+  const isFutureMonth = (curY * 12 + curM) > (new Date().getFullYear() * 12 + new Date().getMonth());
+  const ccFaturaProj = (!ccPaga || isFutureMonth) && ccFatura > 0 ? ccFatura : 0;
   const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   // Add pending reembolsos estimated for this month
   const projRec_reimb = reimbData.filter(r=>{
@@ -704,14 +706,14 @@ function renderHome() {
   }).reduce((s,r)=>s+parseVal(r[2]),0);
   const projRec = projRec_tx + projRec_reimb;
   const projGastoTx = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  // Include unpaid CC fatura for this month in projected gastos
   const projGasto = projGastoTx + ccFaturaProj;
 
-  console.log('=== renderHome DEBUG ===');
-  console.log('ml:', ml, '| saldoInicial:', saldoInicial, '| receitas:', receitas, '| gastos:', gastos);
-  console.log('saldoC6:', saldoC6, '| caixaSaldo:', caixaSaldo, '| saldo total:', saldo);
-  console.log('ccFatura:', ccFatura, '| ccPaga:', ccPaga, '| ccFaturaProj:', ccFaturaProj);
-  console.log('projRec:', projRec, '| projGasto:', projGasto, '| saldoProjetado:', saldo + projRec - projGasto);
-  console.log('txData rows with Transferência:', txData.filter(r=>(r[3]||'').includes('Transferência')).map(r=>[r[0],r[1],r[3],r[4],r[7]]));
+
+
+
+
+
   const saldoColor = saldo >= 0 ? 'pos' : 'neg';
   const hasFx = usdSaldoBRL > 0 || eurSaldoBRL > 0;
   document.getElementById('home-saldo-card').innerHTML = `
