@@ -684,7 +684,11 @@ function renderHome() {
   const {saldo: eurSaldoBRL} = calcFxSaldo(eurData);
   const saldoInicial = calcSaldoInicial();
   const saldoC6 = saldoInicial + receitas - gastos;
-  const saldo = saldoC6 + caixaSaldo; // total BRL (C6 + Caixa)
+  // Total = C6 + Caixa. But transfers from C6→Caixa are already deducted from C6
+  // AND added to Caixa — so we'd double count. 
+  // Caixa balance comes FROM C6, so total is just saldoC6 (which already deducted the transfer)
+  // We show Caixa separately as informational only
+  const saldo = saldoC6; // C6 already deducted the transfer to Caixa
   // CC fatura status for current viewed month
   const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
   const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
@@ -720,7 +724,7 @@ function renderHome() {
     <div class="row"><span class="lbl">Saldo total</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
     <hr class="div">
     <div class="row"><span class="lbl">💚 C6 (conta principal)</span><span class="val">${fmt(saldoC6)}</span></div>
-    ${caixaSaldo !== 0 ? `<div class="row"><span class="lbl">🏦 Caixa</span><span class="val">${fmt(caixaSaldo)}</span></div>` : ''}
+    ${caixaSaldo !== 0 ? `<div class="row"><span class="lbl">🏦 Caixa <span style="font-size:10px;color:var(--text3);">informativo</span></span><span class="val">${fmt(caixaSaldo)}</span></div>` : ''}
     ${hasFx ? `<hr class="div"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Moeda estrangeira (convertida)</div>` : ''}
     ${usdSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇺🇸 USD → R$</span><span class="val">${fmt(usdSaldoBRL)}</span></div>` : ''}
     ${eurSaldoBRL > 0 ? `<div class="row"><span class="lbl">🇪🇺 EUR → R$</span><span class="val">${fmt(eurSaldoBRL)}</span></div>` : ''}
