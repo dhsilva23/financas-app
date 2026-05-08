@@ -440,7 +440,7 @@ function fmt(v) {
   return 'R$' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function fmtFx(v, symbol) {
-  const n = parseFloat(v) || 0;
+  const n = parseVal(v) || 0;
   return symbol + ' ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function parseVal(v) {
