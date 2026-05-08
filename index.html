@@ -959,7 +959,9 @@ function renderHealth() {
   const aporteMeta=metaAporte?parseVal(metaAporte[1]):5000;
   const comprMeta=metaCompr?parseVal(metaCompr[1]):7000;
   const ml_h=curMonthLabel().toLowerCase();
-  const gastosReais=txData.filter(r=>(r[7]||'').toLowerCase()===ml_h&&r[1]==='Gasto'&&r[6]!=='Sim'&&r[3]!=='Pagamento Fatura C6').reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastosDirectos=txData.filter(r=>(r[7]||"").toLowerCase()===ml_h&&r[1]==="Gasto"&&r[6]!=="Sim"&&r[3]!=="Pagamento Fatura C6").reduce((s,r)=>s+parseVal(r[4]),0);
+  const gastosCC=ccData.filter(r=>(r[6]||"").toLowerCase()===ml_h).reduce((s,r)=>s+parseVal(r[3]),0);
+  const gastosReais=gastosDirectos+gastosCC;
   const pendentes=reimbData.filter(r=>(r[4]||'').toLowerCase()==='pendente');
   const totalPend=pendentes.reduce((s,r)=>s+parseVal(r[2]),0);
   const reservaMeses=reservaMeta>0?(poupSaldo/reservaMeta*6):0;
