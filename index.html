@@ -339,6 +339,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
             <button class="popt" onclick="selPay('Transferência',this)"><i class="ti ti-building-bank"></i><br>Transferência</button>
             <button class="popt" onclick="selPay('Reembolso empresa',this)"><i class="ti ti-briefcase"></i><br>Reembolso<br>empresa</button>
             <button class="popt" onclick="selPay('Dinheiro',this)"><i class="ti ti-cash"></i><br>Dinheiro</button>
+            <button class="popt" onclick="selPay('EstornoC6',this)"><i class="ti ti-rotate-clockwise"></i><br>Estorno<br>C6</button>
+          </div>
+          <div id="estorno-fatura-sec" style="display:none;">
+            <div style="background:#E1F5EE;border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#0F6E56;">
+              ↩ O estorno será lançado como valor negativo na fatura selecionada, reduzindo o total a pagar.
+            </div>
+            <div class="fg"><label>Em qual fatura cai o estorno?</label>
+              <select id="inp-estorno-fatura">
+                <option>Março 2026</option><option>Abril 2026</option><option>Maio 2026</option>
+                <option>Junho 2026</option><option>Julho 2026</option><option>Agosto 2026</option>
+                <option>Setembro 2026</option><option>Outubro 2026</option><option>Novembro 2026</option>
+                <option>Dezembro 2026</option>
+              </select>
+            </div>
           </div>
           <div id="cc-fatura-sec" style="display:none;">
             <div style="background:#EEF2FF;border-radius:var(--r-md);padding:10px 12px;margin-bottom:12px;font-size:12px;color:#3B5BDB;">
@@ -1086,6 +1100,7 @@ function goStep1() {
   document.getElementById('step2').classList.remove('active');
   payMethod=''; document.querySelectorAll('.popt').forEach(p=>p.classList.remove('sel'));
   document.getElementById('cc-fatura-sec').style.display='none';
+  document.getElementById('estorno-fatura-sec').style.display='none';
 }
 function goStep2() {
   if (!document.getElementById('inp-val').value||!document.getElementById('inp-desc').value) { showToast('Preencha o valor e a descrição.'); return; }
@@ -1099,7 +1114,8 @@ function goStep2() {
 function selPay(m,el) {
   payMethod=m; el.closest('.popts').querySelectorAll('.popt').forEach(p=>p.classList.remove('sel')); el.classList.add('sel');
   document.getElementById('cc-fatura-sec').style.display=(m==='CartaoC6')?'block':'none';
-  document.getElementById('val-hint').textContent=m==='CartaoC6'?'— valor da parcela':'';
+  document.getElementById('estorno-fatura-sec').style.display=(m==='EstornoC6')?'block':'none';
+  document.getElementById('val-hint').textContent=m==='CartaoC6'?'— valor da parcela':m==='EstornoC6'?'— valor do estorno':'';
 }
 function pagarFatura() {
   const activeTab=document.querySelector('.cct.active');
@@ -1165,6 +1181,10 @@ async function submitTx() {
       for (const r of ccRows) await appendRow('CartaoC6',r);
       if (reimbRow) await appendRow('Reembolsos',reimbRow);
       showToast(`Lançado no C6! ${ccRows.length>1?ccRows.length+' parcelas criadas ✓':'✓'}`);
+    } else if (payMethod==='EstornoC6') {
+      const estornoFatura=document.getElementById('inp-estorno-fatura').value;
+      await appendRow('CartaoC6',[dateFormatted,desc,'Estorno',-rawVal,1,-rawVal,estornoFatura,'Estorno',obs||'Estorno']);
+      showToast('Estorno lançado no C6! ✓');
     } else {
       await appendRow('Lancamentos',row);
       if (reimbRow) await appendRow('Reembolsos',reimbRow);
