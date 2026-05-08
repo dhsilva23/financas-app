@@ -685,9 +685,13 @@ function renderHome() {
   const saldoInicial = calcSaldoInicial();
   const saldoC6 = saldoInicial + receitas - gastos;
   const saldo = saldoC6 + caixaSaldo; // total BRL (C6 + Caixa)
-  const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
-  // Add unpaid CC fatura to projected gastos
+  // CC fatura status (needed for projections)
+  const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
+  const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
+  const ccRows_valid = ccRows_month.filter(r=>r[1]||(r[3]&&parseVal(r[3])>0));
+  const ccPaga = ccRows_valid.length > 0 && ccRows_valid.every(r=>(r[7]||'').toLowerCase()==='pago');
   const ccFaturaProj = !ccPaga ? ccFatura : 0;
+  const projRec_tx = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   // Add pending reembolsos estimated for this month
   const projRec_reimb = reimbData.filter(r=>{
     if ((r[4]||'').toLowerCase() !== 'pendente') return false;
@@ -701,9 +705,6 @@ function renderHome() {
   const projRec = projRec_tx + projRec_reimb;
   const projGastoTx = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
   const projGasto = projGastoTx + ccFaturaProj;
-
-  // CC fatura do mês - case insensitive match
-  const ccFatura = ccData.filter(r=>(r[6]||'').toLowerCase()===ml.toLowerCase()).reduce((s,r)=>s+parseVal(r[3]),0);
 
   const saldoColor = saldo >= 0 ? 'pos' : 'neg';
   const hasFx = usdSaldoBRL > 0 || eurSaldoBRL > 0;
@@ -723,11 +724,6 @@ function renderHome() {
   // Swile removed from home — available in Swile tab
 
   // Projeções
-  // CC fatura: only deduct from projected balance if NOT paid yet
-  const ccRows_month = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower);
-  // Filter out empty rows before checking paid status
-  const ccRows_valid = ccRows_month.filter(r=>r[1]||(r[3]&&parseVal(r[3])>0));
-  const ccPaga = ccRows_valid.length > 0 && ccRows_valid.every(r=>(r[7]||'').toLowerCase()==='pago');
   // ccFatura already included in projGasto when unpaid
   const saldoProjetado = saldo + projRec - projGasto;
   const saldoProjetadoColor = saldoProjetado >= 0 ? '' : 'dn';
