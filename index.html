@@ -778,15 +778,17 @@ function renderOC(which) {
   else renderOCFx(el,'eur',eurData,'ContaEUR','🇪🇺 Euro','EUR','€');
 }
 function renderOCSwile(el) {
+  // swileData formato: [Data, Descrição, Tipo, Valor, Mês]
+  // Tipo: 'Gasto' ou 'Crédito'
   const ml_lower = curMonthLabel().toLowerCase();
-  const allSwile = txData.filter(r=>r[5]==='Swile'||r[5]==='Crédito Swile');
   let saldo=0;
-  allSwile.forEach(r=>{
-    if (r[1]==='Receita'||r[5]==='Crédito Swile') saldo+=parseVal(r[4]);
-    else if (r[1]==='Gasto') saldo-=parseVal(r[4]);
+  swileData.forEach(r=>{
+    const tipo=(r[2]||'').toLowerCase();
+    if (tipo==='crédito'||tipo==='credito') saldo+=parseVal(r[3]);
+    else if (tipo==='gasto') saldo-=parseVal(r[3]);
   });
-  const mesGastos=txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower&&r[5]==='Swile'&&r[1]==='Gasto').reduce((s,r)=>s+parseVal(r[4]),0);
-  const mesCredito=txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower&&r[5]==='Crédito Swile').reduce((s,r)=>s+parseVal(r[4]),0);
+  const mesGastos=swileData.filter(r=>(r[4]||'').toLowerCase()===ml_lower&&(r[2]||'').toLowerCase()==='gasto').reduce((s,r)=>s+parseVal(r[3]),0);
+  const mesCredito=swileData.filter(r=>(r[4]||'').toLowerCase()===ml_lower&&((r[2]||'').toLowerCase()==='crédito'||(r[2]||'').toLowerCase()==='credito')).reduce((s,r)=>s+parseVal(r[3]),0);
   el.innerHTML=`
     <div class="occ swile">
       <div class="sl">Saldo disponível · Swile</div>
@@ -799,11 +801,11 @@ function renderOCSwile(el) {
     </div>
     <button onclick="openOCModal('swile')" style="width:100%;padding:12px;background:var(--green);color:#fff;border:none;border-radius:var(--r-md);font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;">+ Novo lançamento Swile</button>
     <div class="sec-lbl">lançamentos</div>
-    <div class="txl">${allSwile.length?[...allSwile].reverse().slice(0,20).map(r=>{
-      const isInc=r[5]==='Crédito Swile'||r[1]==='Receita';
+    <div class="txl">${swileData.length?[...swileData].reverse().slice(0,20).map(r=>{
+      const isInc=(r[2]||'').toLowerCase()==='crédito'||(r[2]||'').toLowerCase()==='credito';
       return `<div class="tx"><div class="tx-ico" style="background:${isInc?'#E8F5E9':'#FAECE7'};"><i class="ti ti-${isInc?'coin':'leaf'}" style="color:${isInc?'#2E7D32':'#1D9E75'};"></i></div>
-        <div class="tx-info"><div class="tx-desc">${r[2]||''}</div><div class="tx-meta">${r[7]||''} · ${r[5]||''}</div></div>
-        <div class="tx-r"><div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${fmt(r[4])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div></div>`;
+        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[4]||''} · ${r[2]||''}</div></div>
+        <div class="tx-r"><div class="tx-amt ${isInc?'inc':'exp'}">${isInc?'+':'−'}${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div></div>`;
     }).join(''):'<div class="empty">Nenhum lançamento</div>'}</div>`;
 }
 function renderOCFx(el, key, data, sheet, label, currency, symbol) {
@@ -858,9 +860,8 @@ async function submitOC() {
   showToast('Salvando...'); closeOCModal();
   try {
     if (currentOC==='swile') {
-      const meio=ocType==='inc'?'Crédito Swile':'Swile';
-      const tipo=ocType==='inc'?'Receita':'Gasto';
-      await appendRow('Lancamentos',[dateFormatted,tipo,desc,ocType==='exp'?'Alimentação':'',val,meio,'Não',ml,'']);
+      const tipo=ocType==='inc'?'Crédito':'Gasto';
+      await appendRow('Swile',[dateFormatted,desc,tipo,val,ml]);
     } else {
       const sheet=currentOC==='usd'?'ContaUSD':'ContaEUR';
       const tipo=ocType==='exp'?'Saída':'Entrada';
