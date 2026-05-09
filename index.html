@@ -657,16 +657,6 @@ function renderHome() {
     <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
-  // Saldo projetado:
-  // - Mês atual ou passado: saldo realizado + projeções do mês
-  // - Mês futuro: saldo projetado do mês anterior + projeções do mês atual
-  let saldoBase = saldo;
-  if (isFutureMonth) {
-    // Calcular o saldo projetado do mês anterior recursivamente
-    let prevM = curM - 1, prevY = curY;
-    if (prevM < 0) { prevM = 11; prevY--; }
-    saldoBase = calcSaldoProjetado(prevM, prevY);
-  }
   let saldoBase = saldo;
   if (isFutureMonth) {
     let prevM = curM - 1, prevY = curY;
