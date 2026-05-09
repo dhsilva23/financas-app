@@ -586,6 +586,7 @@ function calcSaldoProjetado(m, y) {
   const ml_lower = (MONTHS[m]+' '+y).toLowerCase();
   const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower);
   if (!isFuture) {
+    // Saldo realizado acumulado até este mês (só lançamentos realizados)
     const key = y*12+m;
     let acc = 0;
     txData.forEach(r=>{
@@ -600,16 +601,27 @@ function calcSaldoProjetado(m, y) {
         else if(r[1]==='Gasto') acc-=parseVal(r[4]);
       }
     });
-    return acc;
+    // Soma projeções do mês atual (lançamentos futuros ainda não realizados)
+    const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const projGas = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    return acc + projRec - projGas;
   } else {
     let prevM=m-1, prevY=y;
     if(prevM<0){prevM=11;prevY--;}
     const base = calcSaldoProjetado(prevM, prevY);
     const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
     const projGas = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
-    const ccF = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
-    return base + projRec - projGas - ccF;
+    return base + projRec - projGas;
   }
+}
+
+// Calcula projGasto para um mês (gastos projetados + fatura C6 se não paga)
+function calcProjGasto(m, y) {
+  const ml_lower = (MONTHS[m]+' '+y).toLowerCase();
+  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower);
+  const projGas = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const ccF = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
+  return projGas + ccF;
 }
 
 function renderHome() {
@@ -653,13 +665,15 @@ function renderHome() {
     if (prevM < 0) { prevM = 11; prevY--; }
     saldoBase = calcSaldoProjetado(prevM, prevY);
   }
-  const saldoProjetado = saldoBase + projRec - projGasto;
+  // Saldo projetado não inclui fatura C6 separada — ela é informativa no card abaixo
+  const projGastoSemFatura = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+  const saldoProjetado = saldoBase + projRec - projGastoSemFatura;
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
   document.getElementById('home-proj').innerHTML = `
     <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmt(projRec)}</div></div>
-    <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGasto)}</div></div>
+    <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGastoSemFatura)}</div></div>
     <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${ccPaga?'opacity:.45;text-decoration:line-through;':''}">−${fmt(ccFatura)}</div></div>
     <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetado>=0?'':'dn'}">${fmt(saldoProjetado)}</div></div>
   `;
