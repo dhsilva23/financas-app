@@ -613,7 +613,7 @@ function calcSaldoProjetado(m, y) {
     const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
     const projGas = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
     const ccFat = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
-    return base + projRec - projGas - ccFat;
+    return base + projRec - projGas - ccFat;  // fatura futura nunca está paga
   }
 }
 
@@ -667,7 +667,13 @@ function renderHome() {
     if (prevM < 0) { prevM = 11; prevY--; }
     saldoBase = calcSaldoProjetado(prevM, prevY);
   }
-  const saldoProjetado = calcSaldoProjetado(curM, curY);
+  let saldoBase = saldo;
+  if (isFutureMonth) {
+    let prevM = curM - 1, prevY = curY;
+    if (prevM < 0) { prevM = 11; prevY--; }
+    saldoBase = calcSaldoProjetado(prevM, prevY);
+  }
+  const saldoProjetado = saldoBase + projRec - projGasto;
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
