@@ -667,7 +667,7 @@ function renderHome() {
     if (prevM < 0) { prevM = 11; prevY--; }
     saldoBase = calcSaldoProjetado(prevM, prevY);
   }
-  const saldoProjetado = saldoBase + projRec - projGasto;
+  const saldoProjetado = calcSaldoProjetado(curM, curY);
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
