@@ -304,7 +304,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
               <select id="inp-recorrente-meses" style="width:100%;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:13px;background:var(--bg);color:var(--text);">
                 <option value="3">3 meses</option><option value="6">6 meses</option>
                 <option value="12">12 meses</option><option value="24">24 meses</option>
-                <option value="0">Indefinido (até eu deletar)</option><option value="custom">Outro número...</option>
+                <option value="0">Indefinido (lança 20 meses)</option><option value="custom">Outro número...</option>
               </select>
               <input type="number" id="inp-recorrente-custom" min="1" max="120" placeholder="Quantos meses?" style="display:none;width:100%;margin-top:6px;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:13px;background:var(--bg);color:var(--text);">
               <div style="font-size:10px;color:var(--text3);margin-top:4px;">Um lançamento projetado será criado em cada mês futuro</div>
@@ -1246,7 +1246,7 @@ async function submitTx() {
     if (isRecorrente&&payMethod!=='CartaoC6') {
       const mesesSel=document.getElementById('inp-recorrente-meses')?.value;
       const mesesCustom=parseInt(document.getElementById('inp-recorrente-custom')?.value);
-      const totalMeses=mesesSel==='0'?24:mesesSel==='custom'?(mesesCustom||6):parseInt(mesesSel)||6;
+      const totalMeses=mesesSel==='0'?20:mesesSel==='custom'?(mesesCustom||6):parseInt(mesesSel)||6;
       let recM=parseInt(dp[1])-1,recY=parseInt(dp[0]);
       recM++; if(recM>11){recM=0;recY++;}
       for (let i=0;i<totalMeses;i++) {
