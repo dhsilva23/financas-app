@@ -577,6 +577,41 @@ async function loadAll() {
   } catch(e) { console.error(e); showToast('Erro ao carregar dados.'); }
 }
 
+// Calcula o saldo projetado de qualquer mês:
+// meses realizados: saldo acumulado real (inclui o mês)
+// meses futuros: saldo projetado do mês anterior + receitas previstas - gastos previstos
+function calcSaldoProjetado(m, y) {
+  const now = new Date();
+  const isFuture = (y*12+m) > (now.getFullYear()*12+now.getMonth());
+  const ml_lower = (MONTHS[m]+' '+y).toLowerCase();
+  const monthTx = txData.filter(r=>(r[7]||'').toLowerCase()===ml_lower);
+  if (!isFuture) {
+    const key = y*12+m;
+    let acc = 0;
+    txData.forEach(r=>{
+      const ml2=r[7]||''; if(!ml2) return;
+      const mlN=ml2.charAt(0).toUpperCase()+ml2.slice(1).toLowerCase();
+      const parts=mlN.split(' ');
+      const idx=MONTHS.indexOf(parts[0]);
+      if(idx===-1||!parts[1]) return;
+      const k=parseInt(parts[1])*12+idx;
+      if(k<=key && r[6]!=='Sim') {
+        if(r[1]==='Receita') acc+=parseVal(r[4]);
+        else if(r[1]==='Gasto') acc-=parseVal(r[4]);
+      }
+    });
+    return acc;
+  } else {
+    let prevM=m-1, prevY=y;
+    if(prevM<0){prevM=11;prevY--;}
+    const base = calcSaldoProjetado(prevM, prevY);
+    const projRec = monthTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const projGas = monthTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const ccF = ccData.filter(r=>(r[6]||'').toLowerCase()===ml_lower).reduce((s,r)=>s+parseVal(r[3]),0);
+    return base + projRec - projGas - ccF;
+  }
+}
+
 function renderHome() {
   const ml = curMonthLabel(), ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
@@ -608,7 +643,17 @@ function renderHome() {
     <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
-  const saldoProjetado = saldo + projRec - projGasto;
+  // Saldo projetado:
+  // - Mês atual ou passado: saldo realizado + projeções do mês
+  // - Mês futuro: saldo projetado do mês anterior + projeções do mês atual
+  let saldoBase = saldo;
+  if (isFutureMonth) {
+    // Calcular o saldo projetado do mês anterior recursivamente
+    let prevM = curM - 1, prevY = curY;
+    if (prevM < 0) { prevM = 11; prevY--; }
+    saldoBase = calcSaldoProjetado(prevM, prevY);
+  }
+  const saldoProjetado = saldoBase + projRec - projGasto;
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
