@@ -577,6 +577,10 @@ async function loadAll() {
   } catch(e) { console.error(e); showToast('Erro ao carregar dados.'); }
 }
 
+// Calcula o saldo projetado de qualquer mês:
+// meses realizados: saldo acumulado real (inclui o mês)
+// meses futuros: saldo projetado do mês anterior + receitas previstas - gastos previstos
+
 function renderHome() {
   const ml = curMonthLabel(), ml_lower = ml.toLowerCase();
   const monthTx = txData.filter(r => (r[7]||'').toLowerCase() === ml_lower);
@@ -608,7 +612,40 @@ function renderHome() {
     <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg">−${fmt(gastos)}</span></div>
   `;
 
-  const saldoProjetado = saldo + projRec - projGasto;
+  let saldoBase = saldo;
+  if (isFutureMonth) {
+    // Base = saldo projetado do mês anterior, calculado com a mesma lógica
+    let prevM = curM - 1, prevY = curY;
+    if (prevM < 0) { prevM = 11; prevY--; }
+    const prevMl = (MONTHS[prevM]+' '+prevY).toLowerCase();
+    const prevTx = txData.filter(r=>(r[7]||'').toLowerCase()===prevMl);
+    const prevRec = prevTx.filter(r=>r[1]==='Receita'&&r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const prevGas = prevTx.filter(r=>r[1]==='Gasto'&&r[6]!=='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const prevSaldoInicial = (() => {
+      const k0 = prevY*12+prevM; let acc=0;
+      txData.forEach(r=>{ const ml2=r[7]||''; if(!ml2) return;
+        const p=(ml2.charAt(0).toUpperCase()+ml2.slice(1).toLowerCase()).split(' ');
+        const mi=MONTHS.indexOf(p[0]); if(mi===-1||!p[1]) return;
+        const k=parseInt(p[1])*12+mi;
+        if(k<k0&&r[6]!=='Sim'){ if(r[1]==='Receita') acc+=parseVal(r[4]); else if(r[1]==='Gasto') acc-=parseVal(r[4]); }
+      }); return acc;
+    })();
+    const prevSaldo = prevSaldoInicial + prevRec - prevGas;
+    const prevProjRec_tx = prevTx.filter(r=>r[1]==='Receita'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0);
+    const prevProjRec_reimb = reimbData.filter(r=>{
+      if((r[4]||'').toLowerCase()!=='pendente') return false;
+      const pts=(r[5]||'').split('/'); if(pts.length<3) return false;
+      return (MONTHS[parseInt(pts[1])-1]+' '+pts[2]).toLowerCase()===prevMl;
+    }).reduce((s,r)=>s+parseVal(r[2]),0);
+    const prevProjRec = prevProjRec_tx + prevProjRec_reimb;
+    const prevCCRows = ccData.filter(r=>(r[6]||'').toLowerCase()===prevMl);
+    const prevCCFat = prevCCRows.reduce((s,r)=>s+parseVal(r[3]),0);
+    const prevCCPaga = prevCCRows.length>0 && prevCCRows.every(r=>(r[7]||'').toLowerCase()==='pago');
+    const prevCCFatProj = !prevCCPaga && prevCCFat > 0 ? prevCCFat : 0;
+    const prevProjGas = prevTx.filter(r=>r[1]==='Gasto'&&r[6]==='Sim').reduce((s,r)=>s+parseVal(r[4]),0) + prevCCFatProj;
+    saldoBase = prevSaldo + prevProjRec - prevProjGas;
+  }
+  const saldoProjetado = saldoBase + projRec - projGasto;
   const faturaLabel = ccPaga
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
