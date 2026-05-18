@@ -1161,7 +1161,7 @@ function renderPoup() {
   // Labels: show dd/mm for dates in same month, or Mon/YY for monthly
   const labels = valid.map(r => {
     const p=(r[0]||'').split('/');
-    return p.length===3 ? p[0]+'/'+p[1] : r[0];
+    return p.length===3 ? p[0]+'/'+p[1] : (r[0]||'').split(' ')[0];
   });
   poupChart=new Chart(canvas,{
     type:'line',
@@ -1180,7 +1180,7 @@ function renderPoup() {
     options:{
       responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{
-        label:ctx=>'${fmt(ctx.raw)}',
+        label:ctx=>fmt(ctx.raw),
         title:ctx=>valid[ctx[0].dataIndex][0]||''
       }}},
       scales:{
@@ -1189,14 +1189,20 @@ function renderPoup() {
       }
     }
   });
-  document.getElementById('poup-txs').innerHTML=[...valid].reverse().slice(0,10).map(r=>{
+  const reversed = [...valid].reverse();
+  document.getElementById('poup-txs').innerHTML=reversed.slice(0,10).map((r,i)=>{
     const aporte=parseVal(r[2]),rend=parseVal(r[3]),obs=r[5]||'';
     const icon = aporte>0?'ti-arrow-up-circle':rend>0?'ti-chart-line':'ti-wallet';
     const meta2 = [aporte>0?'Aporte: '+fmt(aporte):'', rend>0?'Rend: '+fmt(rend):'', obs].filter(Boolean).join(' · ');
+    // variação em relação ao item anterior (que no array reversed é o próximo índice)
+    const prevItem = reversed[i+1];
+    const varVal = prevItem ? parseVal(r[1]) - parseVal(prevItem[1]) : 0;
+    const varSign = varVal >= 0 ? '+' : '';
+    const varClass = varVal >= 0 ? 'inc' : 'exp';
     return `<div class="tx">
       <div class="tx-ico" style="background:var(--green-l);"><i class="ti ${icon}" style="color:var(--green-d);"></i></div>
       <div class="tx-info"><div class="tx-desc">${fmt(r[1])}</div><div class="tx-meta">${r[0]||''}${meta2?' · '+meta2:''}</div></div>
-      <div class="tx-r"><div class="tx-amt ${parseVal(r[1])>=(prev?parseVal(prev[1]):0)?'inc':'exp'}">${delta>=0?'+':''}${fmt(parseVal(r[1])-(valid[valid.indexOf(r)-1]?parseVal(valid[valid.indexOf(r)-1][1]):parseVal(r[1])))}</div></div>
+      <div class="tx-r"><div class="tx-amt ${varClass}">${prevItem?varSign+fmt(varVal):'—'}</div></div>
     </div>`;
   }).join('');
   const btn=document.getElementById('poup-update-btn'); if(btn) btn.style.display='block';
