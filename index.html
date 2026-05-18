@@ -204,6 +204,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
       <div class="hdr"><h1>Cartão C6</h1><i class="ti ti-credit-card" style="font-size:18px;color:var(--text3);"></i></div>
       <div class="sec" style="padding-top:14px;">
         <div class="cctabs" id="cc-tabs"></div>
+        <div style="display:flex;gap:7px;margin-bottom:12px;">
+          <button class="cct active" id="cccard-todos" onclick="setCCCard('todos',this)">Todos</button>
+          <button class="cct" id="cccard-0314" onclick="setCCCard('0314',this)">Final 0314</button>
+          <button class="cct" id="cccard-0222" onclick="setCCCard('0222',this)">Final 0222</button>
+        </div>
         <div class="card" id="cc-summary"><div class="loading"><div class="spinner"></div></div></div>
         <div class="sec-lbl">lançamentos</div>
         <div class="txl" id="cc-txs"><div class="loading"><div class="spinner"></div></div></div>
@@ -401,6 +406,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
               </select>
             </div>
             <div class="fg"><label>Parcelas</label><input type="number" value="1" min="1" max="48" id="inp-parc"></div>
+            <div class="fg"><label>Qual cartão?</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button type="button" class="popt" id="cc-card-0314" onclick="selCCCard('0314',this)"><i class="ti ti-credit-card"></i><br>Final 0314</button>
+                <button type="button" class="popt" id="cc-card-0222" onclick="selCCCard('0222',this)"><i class="ti ti-credit-card"></i><br>Final 0222</button>
+              </div>
+            </div>
           </div>
           <button class="sbtn" id="submit-btn" onclick="submitTx()">✓ Registrar lançamento</button>
           <button class="bbtn" onclick="goStep1()">← Voltar</button>
@@ -479,7 +490,7 @@ let usdData = [], eurData = [];
 let editingRow = null, editingSheet = null, selectedTx = null;
 let txType = 'exp', payMethod = '';
 let poupChart = null;
-let currentOC = 'swile', ocType = 'exp';
+let currentOC = 'swile', ocType = 'exp', currentCCCard = 'todos';
 
 function fmt(v) {
   if (v === '' || v === null || v === undefined) return '—';
@@ -831,27 +842,46 @@ function buildCCTabs() {
 function setCCMonth(m, el) {
   document.querySelectorAll('.cct').forEach(t=>t.classList.remove('active')); el.classList.add('active'); setCCMonthRender(m);
 }
+function setCCCard(card, el) {
+  currentCCCard = card;
+  ['todos','0314','0222'].forEach(k=>{
+    const btn=document.getElementById('cccard-'+k);
+    if(btn) btn.classList.toggle('active', k===card);
+  });
+  // re-render current month
+  const activeTab = document.querySelector('.cct.active');
+  if (activeTab) {
+    const sm={'Jan':'Janeiro','Fev':'Fevereiro','Mar':'Março','Abr':'Abril','Mai':'Maio','Jun':'Junho','Jul':'Julho','Ago':'Agosto','Set':'Setembro','Out':'Outubro','Nov':'Novembro','Dez':'Dezembro'};
+    const parts = activeTab.textContent.trim().split(' ');
+    const fullLabel = (sm[parts[0]]||parts[0]) + ' 20' + (parts[1]||'');
+    setCCMonthRender(fullLabel);
+  }
+}
 function setCCMonthRender(m) {
-  const rows=ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
+  const allRows=ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
+  const rows = currentCCCard==='todos' ? allRows : allRows.filter(r=>(r[9]||'').toString().trim()===currentCCCard);
+  const totalFatura=allRows.reduce((s,r)=>s+parseVal(r[3]),0);
   const total=rows.reduce((s,r)=>s+parseVal(r[3]),0);
   const cats={}; rows.forEach(r=>{const c=r[2]||'Outros';cats[c]=(cats[c]||0)+parseVal(r[3]);});
   const catHtml=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>{
     const pct=total>0?Math.round(v/total*100):0;
     return `<div class="cr"><div class="cd" style="background:${catColors[c]||'#888'};"></div><span class="cn">${c}</span><div class="cbw"><div class="cbf" style="width:${pct}%;background:${catColors[c]||'#888'};"></div></div><span class="cv">${fmt(v)}</span></div>`;
   }).join('');
-  const allPago=rows.length>0&&rows.every(r=>(r[7]||'').toLowerCase()==='pago');
-  const hasProj=rows.some(r=>(r[7]||'').toLowerCase()==='projeção');
+  const allPago=allRows.length>0&&allRows.every(r=>(r[7]||'').toLowerCase()==='pago');
+  const hasProj=allRows.some(r=>(r[7]||'').toLowerCase()==='projeção');
   const statusBadge=allPago?'✓ Pago':hasProj?'⏳ Projeção — em aberto':'📋 Em aberto';
+  const cardLabel = currentCCCard==='todos' ? '' : ` · <span style="font-size:10px;background:var(--blue-l);color:var(--blue);padding:2px 7px;border-radius:8px;">Final ${currentCCCard}</span>`;
+  const totalLabel = currentCCCard==='todos' ? 'Total da fatura' : `Final ${currentCCCard} · fatura total: ${fmt(totalFatura)}`;
   document.getElementById('cc-pagar-btn').style.display=allPago?'none':'block';
   document.getElementById('cc-summary').innerHTML=`
-    <div class="row"><span class="lbl">Total da fatura</span><span class="val big neg">${fmt(total)}</span></div>
+    <div class="row"><span class="lbl">${totalLabel}</span><span class="val big neg">${fmt(total)}</span></div>
     <div style="font-size:11px;color:${allPago?'var(--green)':'var(--text3)'};margin-top:2px;">${statusBadge}</div>
     <hr class="div"><div class="sec-lbl" style="margin-bottom:8px;">por categoria</div>
     ${catHtml||'<div class="empty">Sem lançamentos</div>'}`;
   document.getElementById('cc-txs').innerHTML=rows.length
     ? rows.map(r=>{const ri=ccData.indexOf(r);return `<div class="tx" onclick="openTxModal(${ri},'CartaoC6')">
         <div class="tx-ico" style="background:${r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7'};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
-        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}</div></div>
+        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
         <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
       </div>`;}).join('')
     : '<div class="empty">Nenhum lançamento nesta fatura</div>';
@@ -1176,7 +1206,7 @@ function checkReimbField() {
 function goStep1() {
   document.getElementById('step1').classList.add('active');
   document.getElementById('step2').classList.remove('active');
-  payMethod=''; document.querySelectorAll('.popt').forEach(p=>p.classList.remove('sel'));
+  payMethod=''; document.querySelectorAll('.popt').forEach(p=>p.classList.remove('sel')); document.querySelectorAll('#cc-card-0314,#cc-card-0222').forEach(b=>b.classList.remove('sel'));
   document.getElementById('cc-fatura-sec').style.display='none';
   document.getElementById('estorno-fatura-sec').style.display='none';
 }
@@ -1189,6 +1219,11 @@ function goStep2() {
   document.getElementById('pay-opts-exp').style.display=txType==='exp'?'grid':'none';
   document.getElementById('pay-opts-inc').style.display=txType==='inc'?'grid':'none';
 }
+function selCCCard(card, el) {
+  document.querySelectorAll('#cc-card-0314,#cc-card-0222').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
 function selPay(m,el) {
   payMethod=m; el.closest('.popts').querySelectorAll('.popt').forEach(p=>p.classList.remove('sel')); el.classList.add('sel');
   document.getElementById('cc-fatura-sec').style.display=(m==='CartaoC6')?'block':'none';
@@ -1236,7 +1271,9 @@ async function submitTx() {
     const fp=fatura.split(' '); let fatM=MONTHS.indexOf(fp[0]),fatY=parseInt(fp[1]);
     for (let i=0;i<parc;i++) {
       const fatLabel=MONTHS[fatM]+' '+fatY,parcLabel=parc>1?`${i+1}/${parc}`:'';
-      ccRows.push([dateFormatted,desc,cat,rawVal,parc>1?`${i+1}/${parc}`:1,rawVal,fatLabel,'Em aberto',[obs,parcLabel].filter(Boolean).join(' · ')]);
+      const selectedCard = document.querySelector('#cc-card-0314.sel,#cc-card-0222.sel');
+      const cardFinal = selectedCard ? selectedCard.id.replace('cc-card-','') : '';
+      ccRows.push([dateFormatted,desc,cat,rawVal,parc>1?`${i+1}/${parc}`:1,rawVal,fatLabel,'Em aberto',[obs,parcLabel].filter(Boolean).join(' · '),cardFinal]);
       fatM++; if(fatM>11){fatM=0;fatY++;}
     }
   }
