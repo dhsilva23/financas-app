@@ -204,10 +204,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
       <div class="hdr"><h1>Cartão C6</h1><i class="ti ti-credit-card" style="font-size:18px;color:var(--text3);"></i></div>
       <div class="sec" style="padding-top:14px;">
         <div class="cctabs" id="cc-tabs"></div>
-        <div style="display:flex;gap:7px;margin-bottom:12px;">
-          <button class="cct active" id="cccard-todos" onclick="setCCCard('todos',this)">Todos</button>
-          <button class="cct" id="cccard-0314" onclick="setCCCard('0314',this)">Final 0314</button>
-          <button class="cct" id="cccard-0222" onclick="setCCCard('0222',this)">Final 0222</button>
+        <div style="display:flex;gap:7px;margin-bottom:14px;align-items:center;">
+          <span style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-right:2px;">Cartão</span>
+          <button style="padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer;" id="cccard-todos" onclick="setCCCard('todos',this)">Todos</button>
+          <button style="padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;border:1.5px solid var(--blue-l);background:var(--blue-l);color:var(--blue);cursor:pointer;" id="cccard-0314" onclick="setCCCard('0314',this)">· · 0314</button>
+          <button style="padding:5px 13px;border-radius:20px;font-size:12px;font-weight:500;border:1.5px solid var(--blue-l);background:var(--blue-l);color:var(--blue);cursor:pointer;" id="cccard-0222" onclick="setCCCard('0222',this)">· · 0222</button>
         </div>
         <div class="card" id="cc-summary"><div class="loading"><div class="spinner"></div></div></div>
         <div class="sec-lbl">lançamentos</div>
@@ -287,18 +288,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
         <button id="poup-update-btn" onclick="document.getElementById('poup-form').style.display='block';this.style.display='none'" style="display:none;width:100%;margin-top:14px;padding:13px;background:var(--green);color:white;border:none;border-radius:var(--r-md);font-size:14px;font-weight:600;cursor:pointer;">+ Atualizar saldo da poupança</button>
         <div id="poup-form" style="display:none;margin-top:12px;">
           <div class="card">
-            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Atualizar poupança</div>
-            <div class="fg"><label>Mês de referência</label>
-              <select id="poup-mes">
-                <option>Janeiro 2026</option><option>Fevereiro 2026</option><option>Março 2026</option>
-                <option selected>Abril 2026</option><option>Maio 2026</option><option>Junho 2026</option>
-                <option>Julho 2026</option><option>Agosto 2026</option><option>Setembro 2026</option>
-                <option>Outubro 2026</option><option>Novembro 2026</option><option>Dezembro 2026</option>
-              </select>
-            </div>
-            <div class="fg"><label>Saldo total atual (R$)</label><input type="text" inputmode="decimal" id="poup-saldo" placeholder="19.090,06" oninput="maskCurrency(this)"></div>
-            <div class="fg"><label>Aporte no mês (R$)</label><input type="text" inputmode="decimal" id="poup-aporte" placeholder="0,00" oninput="maskCurrency(this)"></div>
-            <div class="fg"><label>Rendimento no mês (R$)</label><input type="text" inputmode="decimal" id="poup-rend" placeholder="0,00" oninput="maskCurrency(this)"></div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Novo registro de poupança</div>
+            <div class="fg"><label>Data</label><input type="date" id="poup-data"></div>
+            <div class="fg"><label>Saldo total atual (R$)</label><input type="text" inputmode="decimal" id="poup-saldo" placeholder="22.131,68" oninput="maskCurrency(this)"></div>
+            <div class="fg"><label>Aporte (R$)</label><input type="text" inputmode="decimal" id="poup-aporte" placeholder="0,00" oninput="maskCurrency(this)"></div>
+            <div class="fg"><label>Rendimento (R$)</label><input type="text" inputmode="decimal" id="poup-rend" placeholder="0,00" oninput="maskCurrency(this)"></div>
+            <div class="fg"><label>Observação (opcional)</label><input type="text" id="poup-obs" placeholder="Ex: Aporte maio, Rendimento CDB..."></div>
             <button class="sbtn" onclick="savePoupanca()">✓ Salvar</button>
             <button class="bbtn" onclick="document.getElementById('poup-form').style.display='none';document.getElementById('poup-update-btn').style.display='block'">Cancelar</button>
           </div>
@@ -834,10 +829,13 @@ function buildCCTabs() {
     const [ma,ya]=a.split(' '); const [mb,yb]=b.split(' ');
     return (parseInt(ya)-parseInt(yb))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
-  document.getElementById('cc-tabs').innerHTML=months.map((m,i)=>
-    `<button class="cct${i===months.length-1?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
+  // Default to current month (curM/curY), fallback to last available
+  const curLabel = MONTHS[curM]+' '+curY;
+  const defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
+  document.getElementById('cc-tabs').innerHTML=months.map(m=>
+    `<button class="cct${m===defaultMonth?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
   ).join('');
-  if (months.length) setCCMonthRender(months[months.length-1]);
+  if (defaultMonth) setCCMonthRender(defaultMonth);
 }
 function setCCMonth(m, el) {
   document.querySelectorAll('.cct').forEach(t=>t.classList.remove('active')); el.classList.add('active'); setCCMonthRender(m);
@@ -846,7 +844,13 @@ function setCCCard(card, el) {
   currentCCCard = card;
   ['todos','0314','0222'].forEach(k=>{
     const btn=document.getElementById('cccard-'+k);
-    if(btn) btn.classList.toggle('active', k===card);
+    if(!btn) return;
+    const isActive = k===card;
+    const isTodos = k==='todos';
+    btn.style.background = isActive ? 'var(--blue)' : 'var(--blue-l)';
+    btn.style.color = isActive ? '#fff' : 'var(--blue)';
+    btn.style.borderColor = isActive ? 'var(--blue)' : 'var(--blue-l)';
+    btn.style.fontWeight = isActive ? '600' : '500';
   });
   // re-render current month
   const activeTab = document.querySelector('.cct.active');
@@ -1069,7 +1073,10 @@ function renderCats() {
 }
 
 function renderHealth() {
-  const lastPoup=poupData.filter(r=>r[0]&&r[1]).pop();
+  const lastPoup=poupData.filter(r=>r[0]&&r[1]).sort((a,b)=>{
+    const toMs=s=>{const p=(s||'').split('/');return p.length===3?new Date(p[2],p[1]-1,p[0]):new Date(s);};
+    return toMs(a[0])-toMs(b[0]);
+  }).pop();
   const poupSaldo=lastPoup?parseVal(lastPoup[1]):0;
   const lastPoupAporte=lastPoup?parseVal(lastPoup[2]):0;
   const metaReserva=metasData.find(r=>r[0]&&r[0].toLowerCase().includes('emergência'));
@@ -1129,15 +1136,21 @@ function renderHealth() {
 }
 
 function renderPoup() {
-  const valid=poupData.filter(r=>r[0]&&r[1]);
+  // Nova estrutura: [Data(dd/mm/yyyy), Saldo, Aporte, Rendimento, Variação, Observação]
+  const valid=poupData.filter(r=>r[0]&&r[1]).sort((a,b)=>{
+    const toMs = s => { const p=(s||'').split('/'); return p.length===3?new Date(p[2],p[1]-1,p[0]):new Date(s); };
+    return toMs(a[0]) - toMs(b[0]);
+  });
   const last=valid[valid.length-1]; if(!last) return;
   const saldo=parseVal(last[1]),prev=valid[valid.length-2],delta=prev?saldo-parseVal(prev[1]):0;
   const metaPoup=metasData.find(r=>r[0]&&r[0].includes('poupança 2026'));
   const meta=metaPoup?parseVal(metaPoup[1]):25000;
   const pct=meta>0?Math.round(saldo/meta*100):0;
+  const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
+  const deltaSign = delta >= 0 ? '+' : '';
   document.getElementById('poup-card').innerHTML=`
     <div class="row"><span class="lbl">Saldo atual</span><span class="val big pos">${fmt(saldo)}</span></div>
-    <div style="font-size:12px;color:var(--green);margin-top:2px;">↑ +${fmt(delta)} vs. mês anterior</div>
+    <div style="font-size:12px;color:${deltaColor};margin-top:2px;">${deltaSign}${fmt(delta)} vs. registro anterior · ${last[0]||''}</div>
     <hr class="div">
     <div class="row"><span class="lbl">Meta 2026</span><span class="val">${fmt(meta)}</span></div>
     <div class="row"><span class="lbl">Progresso</span><span class="val pos">${pct}%</span></div>
@@ -1145,28 +1158,68 @@ function renderPoup() {
     <div style="font-size:10px;color:var(--text3);">Faltam ${fmt(Math.max(0,meta-saldo))} para a meta</div>`;
   const canvas=document.getElementById('poupChart'); if(!canvas) return;
   if(poupChart) poupChart.destroy();
+  // Labels: show dd/mm for dates in same month, or Mon/YY for monthly
+  const labels = valid.map(r => {
+    const p=(r[0]||'').split('/');
+    return p.length===3 ? p[0]+'/'+p[1] : r[0];
+  });
   poupChart=new Chart(canvas,{
     type:'line',
-    data:{labels:valid.map(r=>r[0].split(' ')[0]+' '+r[0].split(' ')[1]?.slice(2)),datasets:[{data:valid.map(r=>parseVal(r[1])),borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.07)',fill:true,tension:0.4,pointRadius:2,pointBackgroundColor:'#1D9E75',borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'R$ '+ctx.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}}},scales:{x:{ticks:{font:{size:9},color:'#888',maxTicksLimit:6,autoSkip:true},grid:{display:false}},y:{ticks:{font:{size:9},color:'#888',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(128,128,128,0.08)'}}}}
+    data:{
+      labels,
+      datasets:[{
+        data:valid.map(r=>parseVal(r[1])),
+        borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.07)',
+        fill:true,tension:0.3,
+        pointRadius:valid.length < 20 ? 4 : 2,
+        pointBackgroundColor:'#1D9E75',
+        pointBorderColor:'#fff',pointBorderWidth:2,
+        borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:ctx=>'${fmt(ctx.raw)}',
+        title:ctx=>valid[ctx[0].dataIndex][0]||''
+      }}},
+      scales:{
+        x:{ticks:{font:{size:9},color:'#888',maxTicksLimit:8,autoSkip:true},grid:{display:false}},
+        y:{ticks:{font:{size:9},color:'#888',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(128,128,128,0.08)'}}
+      }
+    }
   });
-  document.getElementById('poup-txs').innerHTML=[...valid].reverse().slice(0,6).map(r=>`
-    <div class="tx"><div class="tx-ico" style="background:var(--green-l);"><i class="ti ti-trending-up" style="color:var(--green-d);"></i></div>
-      <div class="tx-info"><div class="tx-desc">${r[0]}</div><div class="tx-meta">Aporte: ${fmt(r[2])} · Rendimento: ${fmt(r[3])}</div></div>
-      <div class="tx-r"><div class="tx-amt inc">${fmt(r[1])}</div></div></div>`).join('');
+  document.getElementById('poup-txs').innerHTML=[...valid].reverse().slice(0,10).map(r=>{
+    const aporte=parseVal(r[2]),rend=parseVal(r[3]),obs=r[5]||'';
+    const icon = aporte>0?'ti-arrow-up-circle':rend>0?'ti-chart-line':'ti-wallet';
+    const meta2 = [aporte>0?'Aporte: '+fmt(aporte):'', rend>0?'Rend: '+fmt(rend):'', obs].filter(Boolean).join(' · ');
+    return `<div class="tx">
+      <div class="tx-ico" style="background:var(--green-l);"><i class="ti ${icon}" style="color:var(--green-d);"></i></div>
+      <div class="tx-info"><div class="tx-desc">${fmt(r[1])}</div><div class="tx-meta">${r[0]||''}${meta2?' · '+meta2:''}</div></div>
+      <div class="tx-r"><div class="tx-amt ${parseVal(r[1])>=(prev?parseVal(prev[1]):0)?'inc':'exp'}">${delta>=0?'+':''}${fmt(parseVal(r[1])-(valid[valid.indexOf(r)-1]?parseVal(valid[valid.indexOf(r)-1][1]):parseVal(r[1])))}</div></div>
+    </div>`;
+  }).join('');
   const btn=document.getElementById('poup-update-btn'); if(btn) btn.style.display='block';
 }
 async function savePoupanca() {
-  const mes=document.getElementById('poup-mes').value;
+  const rawDate=document.getElementById('poup-data').value;
   const saldoN=parseVal(document.getElementById('poup-saldo').value);
   const aporteN=parseVal(document.getElementById('poup-aporte').value||'0');
   const rendN=parseVal(document.getElementById('poup-rend').value||'0');
-  if (!mes||!saldoN) { showToast('Preencha o mês e o saldo.'); return; }
-  const existIdx=poupData.findIndex(r=>(r[0]||'').toLowerCase()===mes.toLowerCase());
+  const obs=document.getElementById('poup-obs').value||'';
+  if (!rawDate||!saldoN) { showToast('Preencha a data e o saldo.'); return; }
+  const dp=rawDate.split('-');
+  const dateFormatted=`${dp[2]}/${dp[1]}/${dp[0]}`;
   showToast('Salvando poupança...');
-  if (existIdx>=0) await updateRow('Poupanca',existIdx+2,[mes,saldoN,aporteN,rendN,'','']);
-  else await appendRow('Poupanca',[mes,saldoN,aporteN,rendN,'','']);
-  await loadAll(); document.getElementById('poup-form').style.display='none'; showToast('Poupança atualizada! ✓');
+  await appendRow('Poupanca',[dateFormatted,saldoN,aporteN,rendN,'',obs]);
+  await loadAll();
+  document.getElementById('poup-form').style.display='none';
+  document.getElementById('poup-update-btn').style.display='block';
+  document.getElementById('poup-saldo').value='';
+  document.getElementById('poup-aporte').value='';
+  document.getElementById('poup-rend').value='';
+  document.getElementById('poup-obs').value='';
+  showToast('Poupança atualizada! ✓');
 }
 
 function resetAddForm() {
@@ -1218,6 +1271,17 @@ function goStep2() {
   document.getElementById('step2-title').textContent=(txType==='exp'?'Como foi pago?':'Como foi recebido?')+(isProj?' (projeção)':'');
   document.getElementById('pay-opts-exp').style.display=txType==='exp'?'grid':'none';
   document.getElementById('pay-opts-inc').style.display=txType==='inc'?'grid':'none';
+  // Populate fatura options: current month onwards
+  const fatSel=document.getElementById('inp-fatura');
+  fatSel.innerHTML='';
+  let fm=curM,fy=curY;
+  for(let i=0;i<24;i++){
+    const opt=document.createElement('option');
+    opt.textContent=MONTHS[fm]+' '+fy;
+    if(i===0) opt.selected=true;
+    fatSel.appendChild(opt);
+    fm++;if(fm>11){fm=0;fy++;}
+  }
 }
 function selCCCard(card, el) {
   document.querySelectorAll('#cc-card-0314,#cc-card-0222').forEach(b=>b.classList.remove('sel'));
