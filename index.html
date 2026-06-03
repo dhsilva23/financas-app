@@ -235,7 +235,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
 
     <!-- REEMBOLSOS -->
     <div class="screen" id="screen-reimb">
-      <div class="hdr"><h1>Reembolsos</h1><span style="font-size:11px;color:var(--text3);">Empresa</span></div>
+      <div class="hdr"><h1>Reembolsos</h1><button onclick="openReimbModal()" style="background:var(--green);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;">+ Novo</button></div>
       <div class="sec" style="padding-top:14px;">
         <div class="card" id="reimb-total" style="background:var(--yellow-l);"></div>
         <div class="sec-lbl">em aberto</div>
@@ -467,6 +467,60 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
     <div class="fg"><label>Data</label><input type="date" id="oc-date"></div>
     <button class="sbtn" onclick="submitOC()">✓ Salvar</button>
     <button class="bbtn" onclick="closeOCModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal: novo reembolso manual -->
+<div class="modal-bg" id="reimb-modal">
+  <div class="modal-sheet">
+    <h2>Novo Reembolso</h2>
+    <div class="fg"><label>Descrição</label><input type="text" id="reimb-m-desc" placeholder="Ex: Almoço cliente, Hotel..."></div>
+    <div class="fg"><label>Valor (R$)</label><input type="text" inputmode="decimal" id="reimb-m-val" placeholder="0,00" oninput="maskCurrency(this)" style="font-size:20px;font-weight:600;"></div>
+    <div class="fg"><label>Data do gasto</label><input type="date" id="reimb-m-data"></div>
+    <div class="fg"><label>Meio de pagamento</label>
+      <select id="reimb-m-meio">
+        <option>Swile</option>
+        <option>Pix</option>
+        <option>Débito</option>
+        <option>Dinheiro</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="fg"><label>Data estimada do reembolso</label><input type="date" id="reimb-m-est"></div>
+    <div class="fg"><label>Tipo</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="tbtn ainc" id="reimb-m-emp" onclick="selReimbTipo('empresa',this)">🏢 Empresa</button>
+        <button type="button" class="tbtn" id="reimb-m-pes" onclick="selReimbTipo('pessoa',this)">👤 Pessoa</button>
+      </div>
+    </div>
+    <div class="fg" id="reimb-m-nome-fg" style="display:none;"><label>Nome da pessoa</label><input type="text" id="reimb-m-nome" placeholder="Ex: João, Maria..."></div>
+    <button class="sbtn" onclick="saveReimbManual()">✓ Salvar reembolso</button>
+    <button class="bbtn" onclick="closeReimbModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal: novo reembolso manual -->
+<div class="modal-bg" id="reimb-modal">
+  <div class="modal-sheet">
+    <h2>Novo Reembolso</h2>
+    <div class="fg"><label>Descrição</label><input type="text" id="reimb-m-desc" placeholder="Ex: Almoço cliente, Hotel..."></div>
+    <div class="fg"><label>Valor (R$)</label><input type="text" inputmode="decimal" id="reimb-m-val" placeholder="0,00" oninput="maskCurrency(this)" style="font-size:20px;font-weight:600;"></div>
+    <div class="fg"><label>Data do gasto</label><input type="date" id="reimb-m-data"></div>
+    <div class="fg"><label>Meio de pagamento</label>
+      <select id="reimb-m-meio">
+        <option>Swile</option><option>Pix</option><option>Débito</option><option>Dinheiro</option><option>Outro</option>
+      </select>
+    </div>
+    <div class="fg"><label>Data estimada do reembolso</label><input type="date" id="reimb-m-est"></div>
+    <div class="fg"><label>Tipo</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="tbtn ainc" id="reimb-m-emp" onclick="selReimbTipo('empresa',this)">🏢 Empresa</button>
+        <button type="button" class="tbtn" id="reimb-m-pes" onclick="selReimbTipo('pessoa',this)">👤 Pessoa</button>
+      </div>
+    </div>
+    <div class="fg" id="reimb-m-nome-fg" style="display:none;"><label>Nome da pessoa</label><input type="text" id="reimb-m-nome" placeholder="Ex: João, Maria..."></div>
+    <button class="sbtn" onclick="saveReimbManual()">✓ Salvar reembolso</button>
+    <button class="bbtn" onclick="closeReimbModal()">Cancelar</button>
   </div>
 </div>
 
@@ -1029,6 +1083,88 @@ function renderReimb() {
       }).join('')
     : '<div class="empty">Nenhum recebimento ainda</div>';
 }
+let reimbTipo = 'empresa';
+function openReimbModal() {
+  reimbTipo = 'empresa';
+  document.getElementById('reimb-m-desc').value = '';
+  document.getElementById('reimb-m-val').value = '';
+  document.getElementById('reimb-m-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('reimb-m-est').value = '';
+  document.getElementById('reimb-m-meio').value = 'Swile';
+  document.getElementById('reimb-m-nome').value = '';
+  document.getElementById('reimb-m-nome-fg').style.display = 'none';
+  document.getElementById('reimb-m-emp').className = 'tbtn ainc';
+  document.getElementById('reimb-m-pes').className = 'tbtn';
+  document.getElementById('reimb-modal').classList.add('open');
+}
+function closeReimbModal() {
+  document.getElementById('reimb-modal').classList.remove('open');
+}
+function selReimbTipo(tipo, el) {
+  reimbTipo = tipo;
+  document.getElementById('reimb-m-emp').className = tipo==='empresa' ? 'tbtn ainc' : 'tbtn';
+  document.getElementById('reimb-m-pes').className = tipo==='pessoa' ? 'tbtn ainc' : 'tbtn';
+  document.getElementById('reimb-m-nome-fg').style.display = tipo==='pessoa' ? 'block' : 'none';
+}
+async function saveReimbManual() {
+  const desc = document.getElementById('reimb-m-desc').value;
+  const val = parseVal(document.getElementById('reimb-m-val').value);
+  const rawData = document.getElementById('reimb-m-data').value;
+  const rawEst = document.getElementById('reimb-m-est').value;
+  const meio = document.getElementById('reimb-m-meio').value;
+  const nome = document.getElementById('reimb-m-nome').value || '';
+  if (!desc || !val || !rawData) { showToast('Preencha descrição, valor e data.'); return; }
+  const dp = rawData.split('-');
+  const dateFormatted = `${dp[2]}/${dp[1]}/${dp[0]}`;
+  const estFormatted = rawEst ? (() => { const ep=rawEst.split('-'); return `${ep[2]}/${ep[1]}/${ep[0]}`; })() : '';
+  const row = [dateFormatted, desc, val, meio, 'Pendente', estFormatted, '', '', reimbTipo === 'pessoa' ? 'Pessoa' : 'Empresa', nome];
+  showToast('Salvando...'); closeReimbModal();
+  await appendRow('Reembolsos', row);
+  await loadAll(); renderReimb();
+  showToast('Reembolso adicionado! ✓');
+}
+
+let reimbTipo = 'empresa';
+function openReimbModal() {
+  reimbTipo = 'empresa';
+  document.getElementById('reimb-m-desc').value = '';
+  document.getElementById('reimb-m-val').value = '';
+  document.getElementById('reimb-m-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('reimb-m-est').value = '';
+  document.getElementById('reimb-m-meio').value = 'Swile';
+  document.getElementById('reimb-m-nome').value = '';
+  document.getElementById('reimb-m-nome-fg').style.display = 'none';
+  document.getElementById('reimb-m-emp').className = 'tbtn ainc';
+  document.getElementById('reimb-m-pes').className = 'tbtn';
+  document.getElementById('reimb-modal').classList.add('open');
+}
+function closeReimbModal() {
+  document.getElementById('reimb-modal').classList.remove('open');
+}
+function selReimbTipo(tipo, el) {
+  reimbTipo = tipo;
+  document.getElementById('reimb-m-emp').className = tipo==='empresa' ? 'tbtn ainc' : 'tbtn';
+  document.getElementById('reimb-m-pes').className = tipo==='pessoa' ? 'tbtn ainc' : 'tbtn';
+  document.getElementById('reimb-m-nome-fg').style.display = tipo==='pessoa' ? 'block' : 'none';
+}
+async function saveReimbManual() {
+  const desc = document.getElementById('reimb-m-desc').value;
+  const val = parseVal(document.getElementById('reimb-m-val').value);
+  const rawData = document.getElementById('reimb-m-data').value;
+  const rawEst = document.getElementById('reimb-m-est').value;
+  const meio = document.getElementById('reimb-m-meio').value;
+  const nome = document.getElementById('reimb-m-nome').value || '';
+  if (!desc || !val || !rawData) { showToast('Preencha descrição, valor e data.'); return; }
+  const dp = rawData.split('-');
+  const dateFormatted = `${dp[2]}/${dp[1]}/${dp[0]}`;
+  const estFormatted = rawEst ? (()=>{ const ep=rawEst.split('-'); return `${ep[2]}/${ep[1]}/${ep[0]}`; })() : '';
+  const row = [dateFormatted, desc, val, meio, 'Pendente', estFormatted, '', '', reimbTipo==='pessoa'?'Pessoa':'Empresa', nome];
+  showToast('Salvando...'); closeReimbModal();
+  await appendRow('Reembolsos', row);
+  await loadAll(); renderReimb();
+  showToast('Reembolso adicionado! ✓');
+}
+
 async function markReimbReceived(idx) {
   const r=reimbData[idx];
   if (!confirm(`Confirmar recebimento de ${fmt(parseVal(r[2]))} referente a "${r[1]||'este item'}"?`)) return;
