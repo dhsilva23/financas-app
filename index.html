@@ -1124,47 +1124,6 @@ async function saveReimbManual() {
   showToast('Reembolso adicionado! ✓');
 }
 
-let reimbTipo = 'empresa';
-function openReimbModal() {
-  reimbTipo = 'empresa';
-  document.getElementById('reimb-m-desc').value = '';
-  document.getElementById('reimb-m-val').value = '';
-  document.getElementById('reimb-m-data').value = new Date().toISOString().split('T')[0];
-  document.getElementById('reimb-m-est').value = '';
-  document.getElementById('reimb-m-meio').value = 'Swile';
-  document.getElementById('reimb-m-nome').value = '';
-  document.getElementById('reimb-m-nome-fg').style.display = 'none';
-  document.getElementById('reimb-m-emp').className = 'tbtn ainc';
-  document.getElementById('reimb-m-pes').className = 'tbtn';
-  document.getElementById('reimb-modal').classList.add('open');
-}
-function closeReimbModal() {
-  document.getElementById('reimb-modal').classList.remove('open');
-}
-function selReimbTipo(tipo, el) {
-  reimbTipo = tipo;
-  document.getElementById('reimb-m-emp').className = tipo==='empresa' ? 'tbtn ainc' : 'tbtn';
-  document.getElementById('reimb-m-pes').className = tipo==='pessoa' ? 'tbtn ainc' : 'tbtn';
-  document.getElementById('reimb-m-nome-fg').style.display = tipo==='pessoa' ? 'block' : 'none';
-}
-async function saveReimbManual() {
-  const desc = document.getElementById('reimb-m-desc').value;
-  const val = parseVal(document.getElementById('reimb-m-val').value);
-  const rawData = document.getElementById('reimb-m-data').value;
-  const rawEst = document.getElementById('reimb-m-est').value;
-  const meio = document.getElementById('reimb-m-meio').value;
-  const nome = document.getElementById('reimb-m-nome').value || '';
-  if (!desc || !val || !rawData) { showToast('Preencha descrição, valor e data.'); return; }
-  const dp = rawData.split('-');
-  const dateFormatted = `${dp[2]}/${dp[1]}/${dp[0]}`;
-  const estFormatted = rawEst ? (()=>{ const ep=rawEst.split('-'); return `${ep[2]}/${ep[1]}/${ep[0]}`; })() : '';
-  const row = [dateFormatted, desc, val, meio, 'Pendente', estFormatted, '', '', reimbTipo==='pessoa'?'Pessoa':'Empresa', nome];
-  showToast('Salvando...'); closeReimbModal();
-  await appendRow('Reembolsos', row);
-  await loadAll(); renderReimb();
-  showToast('Reembolso adicionado! ✓');
-}
-
 async function markReimbReceived(idx) {
   const r=reimbData[idx];
   if (!confirm(`Confirmar recebimento de ${fmt(parseVal(r[2]))} referente a "${r[1]||'este item'}"?`)) return;
