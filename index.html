@@ -1510,6 +1510,8 @@ async function submitTx() {
 }
 
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+document.getElementById("month-label").textContent = curMonthLabel();
+document.getElementById("cat-month-label").textContent = catMonthLabel();
 loadAll();
 </script>
 </body>
