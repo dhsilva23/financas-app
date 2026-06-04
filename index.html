@@ -742,10 +742,10 @@ function renderHome() {
   const card = document.getElementById('home-saldo-card');
   card.className = 'card ' + saldoCardClass;
   card.innerHTML = `
-    <div class="row"><span class="lbl" style="font-weight:700;font-size:17px;">Saldo total</span><span class="val big ${saldoColor}">${fmt(saldo)}</span></div>
+    <div class="row"><span class="lbl" style="font-weight:700;font-size:17px;">Saldo total</span><span class="val big ${saldoColor}">${fmtH(saldo)}</span></div>
     <hr class="div">
-    <div class="row"><span class="lbl">↓ Receitas realizadas</span><span class="val pos" style="font-size:15px;font-weight:600;">+${fmt(receitas)}</span></div>
-    <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg" style="font-size:15px;font-weight:600;">−${fmt(gastos)}</span></div>
+    <div class="row"><span class="lbl">↓ Receitas realizadas</span><span class="val pos" style="font-size:15px;font-weight:600;">+${fmtH(receitas)}</span></div>
+    <div class="row"><span class="lbl">↑ Gastos realizados</span><span class="val neg" style="font-size:15px;font-weight:600;">−${fmtH(gastos)}</span></div>
   `;
 
   const saldoProjetado = isFutureMonth ? getSaldoProjetado(curM, curY) : saldo + projRec - projGasto;
@@ -756,7 +756,7 @@ function renderHome() {
     <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmtH(projRec)}</div></div>
     <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmtH(projGasto)}</div></div>
     <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${ccPaga?'opacity:.45;text-decoration:line-through;':''}">−${fmtH(ccFatura)}</div></div>
-    <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetado>=0?'':'dn'}">${fmt(saldoProjetado)}</div></div>
+    <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetado>=0?'':'dn'}">${fmtH(saldoProjetado)}</div></div>
   `;
 
   const pendentes = reimbData.filter(r=>(r[4]||'').trim().toLowerCase()==='pendente');
@@ -889,13 +889,14 @@ function buildCCTabs() {
   // Default to current month if unpaid, otherwise next unpaid, fallback to current
   const curLabel = MONTHS[curM]+' '+curY;
   const curOrNext = months.find(m => {
-    const ml = m.toLowerCase();
     const [ma,ya] = m.split(' ');
     const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
     const curKey = curY*12 + curM;
     if (key < curKey) return false; // skip past months
+    const ml = m.toLowerCase();
     const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===ml);
-    const paga = rows.length>0 && rows.every(r=>(r[7]||'').toLowerCase()==='pago');
+    if (rows.length === 0) return false; // skip months with no data
+    const paga = rows.every(r=>(r[7]||'').toLowerCase()==='pago');
     return !paga; // first unpaid from current month onwards
   });
   const defaultMonth = curOrNext || months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
