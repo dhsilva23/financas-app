@@ -888,19 +888,15 @@ function buildCCTabs() {
     const mb=pb[0].charAt(0).toUpperCase()+pb[0].slice(1).toLowerCase();
     return (parseInt(pa[1])-parseInt(pb[1]))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
-  // Default: first month >= current that is not fully paid
   const curLabel = MONTHS[curM]+' '+curY;
-  const curKey = curY*12+curM;
-  const defaultMonth = months.find(m => {
-    const [ma,ya] = m.split(' ');
-    const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
-    if (key < curKey) return false;
+  const curLabelLower = curLabel.toLowerCase();
+  const curIdx = months.findIndex(m => m.toLowerCase() === curLabelLower);
+  const startIdx = curIdx >= 0 ? curIdx : 0;
+  const defaultMonth = months.slice(startIdx).find(m => {
     const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
     if (rows.length === 0) return false;
-    // Consider month paid if all non-estorno rows are pago
-    const allPaid = rows.every(r=>['pago','estorno'].includes((r[7]||'').toLowerCase()));
-    return !allPaid;
-  }) || months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
+    return !rows.every(r=>['pago','estorno'].includes((r[7]||'').toLowerCase()));
+  }) || months[startIdx] || months[months.length-1];
   document.getElementById('cc-tabs').innerHTML=months.map(m=>
     `<button class="cct${m===defaultMonth?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
   ).join('');
