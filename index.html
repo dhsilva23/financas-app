@@ -886,25 +886,19 @@ function buildCCTabs() {
     const [ma,ya]=a.split(' '); const [mb,yb]=b.split(' ');
     return (parseInt(ya)-parseInt(yb))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
-  // Default: prefer current month; if fully paid, go to next month
+  // Default: first month >= current that is not fully paid
   const curLabel = MONTHS[curM]+' '+curY;
-  const curMonthRows = ccData.filter(r=>(r[6]||'').toLowerCase()===curLabel.toLowerCase());
-  const curMonthPaga = curMonthRows.length>0 && curMonthRows.every(r=>(r[7]||'').toLowerCase()==='pago');
-  let defaultMonth;
-  if (!curMonthPaga && curMonthRows.length>0) {
-    // Current month has data and is not fully paid
-    defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase());
-  }
-  if (!defaultMonth) {
-    // Find the very next month after current with data
-    const curKey = curY*12+curM;
-    defaultMonth = months.find(m=>{
-      const [ma,ya]=m.split(' ');
-      const key=parseInt(ya)*12+MONTHS.indexOf(ma);
-      return key===curKey+1 && ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase()).length>0;
-    });
-  }
-  if (!defaultMonth) defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
+  const curKey = curY*12+curM;
+  const defaultMonth = months.find(m => {
+    const [ma,ya] = m.split(' ');
+    const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
+    if (key < curKey) return false;
+    const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
+    if (rows.length === 0) return false;
+    // Consider month paid if all non-estorno rows are pago
+    const allPaid = rows.every(r=>['pago','estorno'].includes((r[7]||'').toLowerCase()));
+    return !allPaid;
+  }) || months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
   document.getElementById('cc-tabs').innerHTML=months.map(m=>
     `<button class="cct${m===defaultMonth?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
   ).join('');
