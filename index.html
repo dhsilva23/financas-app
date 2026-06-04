@@ -173,10 +173,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
     <div class="screen active" id="screen-home">
       <div class="hdr">
         <h1>Minhas Finanças</h1>
-        <div class="mnav">
-          <button onclick="changeMonth(-1)">‹</button>
-          <span id="month-label">Maio 2026</span>
-          <button onclick="changeMonth(1)">›</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="toggleHide()" id="hide-btn" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:0 4px;line-height:1;"><i class="ti ti-eye" id="hide-icon"></i></button>
+          <div class="mnav">
+            <button onclick="changeMonth(-1)">‹</button>
+            <span id="month-label">Maio 2026</span>
+            <button onclick="changeMonth(1)">›</button>
+          </div>
         </div>
       </div>
       <div class="sec" style="padding-top:14px;">
@@ -750,9 +753,9 @@ function renderHome() {
     ? `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--green);">✓ paga</span>`
     : `Fatura C6 (${ml.split(' ')[0]}) <span style="font-size:9px;color:var(--red);">em aberto</span>`;
   document.getElementById('home-proj').innerHTML = `
-    <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmt(projRec)}</div></div>
-    <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmt(projGasto)}</div></div>
-    <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${ccPaga?'opacity:.45;text-decoration:line-through;':''}">−${fmt(ccFatura)}</div></div>
+    <div class="sc"><div class="sl">Receitas previstas</div><div class="sv up">+${fmtH(projRec)}</div></div>
+    <div class="sc"><div class="sl">Gastos previstos</div><div class="sv dn">−${fmtH(projGasto)}</div></div>
+    <div class="sc"><div class="sl">${faturaLabel}</div><div class="sv dn" style="${ccPaga?'opacity:.45;text-decoration:line-through;':''}">−${fmtH(ccFatura)}</div></div>
     <div class="sc"><div class="sl">Saldo projetado</div><div class="sv ${saldoProjetado>=0?'':'dn'}">${fmt(saldoProjetado)}</div></div>
   `;
 
@@ -883,9 +886,19 @@ function buildCCTabs() {
     const [ma,ya]=a.split(' '); const [mb,yb]=b.split(' ');
     return (parseInt(ya)-parseInt(yb))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
-  // Default to current month (curM/curY), fallback to last available
+  // Default to current month if unpaid, otherwise next unpaid, fallback to current
   const curLabel = MONTHS[curM]+' '+curY;
-  const defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
+  const curOrNext = months.find(m => {
+    const ml = m.toLowerCase();
+    const [ma,ya] = m.split(' ');
+    const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
+    const curKey = curY*12 + curM;
+    if (key < curKey) return false; // skip past months
+    const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===ml);
+    const paga = rows.length>0 && rows.every(r=>(r[7]||'').toLowerCase()==='pago');
+    return !paga; // first unpaid from current month onwards
+  });
+  const defaultMonth = curOrNext || months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
   document.getElementById('cc-tabs').innerHTML=months.map(m=>
     `<button class="cct${m===defaultMonth?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
   ).join('');
@@ -1199,11 +1212,11 @@ function renderHealth() {
       <div><div style="font-size:16px;font-weight:600;margin-bottom:3px;">${score>=75?'Boa saúde financeira':score>=50?'Saúde financeira ok':'Atenção necessária'}</div><div style="font-size:12px;color:var(--text3);">Baseado em ${curMonthLabel()}</div></div>
     </div>`;
   document.getElementById('health-kpis').innerHTML=`
-    <div class="sc"><div class="sl">Gastos do mês</div><div class="sv ${comprOk?'up':'dn'}">${fmt(gastosReais)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: até ${fmt(comprMeta)} ${comprOk?'✓':'⚠️'}</div></div>
-    <div class="sc"><div class="sl">Aporte poupança</div><div class="sv ${aporteOk?'up':'wn'}">${fmt(lastPoupAporte)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: ${fmt(aporteMeta)}/mês ${aporteOk?'✓':'⚠️'}</div></div>
+    <div class="sc"><div class="sl">Gastos do mês</div><div class="sv ${comprOk?'up':'dn'}">${fmtH(gastosReais)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: até ${fmt(comprMeta)} ${comprOk?'✓':'⚠️'}</div></div>
+    <div class="sc"><div class="sl">Aporte poupança</div><div class="sv ${aporteOk?'up':'wn'}">${fmtH(lastPoupAporte)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: ${fmt(aporteMeta)}/mês ${aporteOk?'✓':'⚠️'}</div></div>
     <div class="sc"><div class="sl">Reserva emergência</div><div class="sv ${reservaMeses>=3?'up':'wn'}">${reservaMeses.toFixed(1)} meses</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta: 6 meses</div></div>
-    <div class="sc"><div class="sl">Poupança total</div><div class="sv up">${fmt(poupSaldo)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta 2026: ${fmt(poupMeta)}</div></div>
-    <div class="sc"><div class="sl">Reembolsos pend.</div><div class="sv wn">${fmt(totalPend)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">${pendentes.length} item(s)</div></div>`;
+    <div class="sc"><div class="sl">Poupança total</div><div class="sv up">${fmtH(poupSaldo)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px;">Meta 2026: ${fmt(poupMeta)}</div></div>
+`;
   const insights=[];
   if (!comprOk) insights.push(`<div class="insight"><span class="insight-ico">⚠️</span><div class="insight-txt"><strong>Gastos acima da meta.</strong> ${fmt(gastosReais)} — ${fmt(gastosReais-comprMeta)} acima do limite de ${fmt(comprMeta)}.</div></div>`);
   else insights.push(`<div class="insight"><span class="insight-ico">✅</span><div class="insight-txt"><strong>Gastos dentro da meta!</strong> ${fmt(gastosReais)} de ${fmt(comprMeta)} — ${fmt(comprMeta-gastosReais)} de margem.</div></div>`);
@@ -1217,17 +1230,17 @@ function renderHealth() {
   const resPct=Math.min(Math.round(poupSaldo/reservaMeta*100),100);
   const comprPct=Math.min(Math.round(gastosReais/comprMeta*100),100);
   document.getElementById('health-metas').innerHTML=`
-    <div class="row"><span class="lbl">Meta poupança 2026</span><span class="val" style="font-size:12px;">${fmt(poupSaldo)} / ${fmt(poupMeta)}</span></div>
+    <div class="row"><span class="lbl">Meta poupança 2026</span><span class="val" style="font-size:12px;">${fmtH(poupSaldo)} / ${fmtH(poupMeta)}</span></div>
     <div class="pw"><div class="pf" style="width:${poupPct}%;background:var(--green);"></div></div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${poupPct}% ${poupPct>=100?'— Meta atingida! 🎉':'— no caminho certo ✓'}</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${pctH(poupPct)} ${poupPct>=100?'— Meta atingida! 🎉':'— no caminho certo ✓'}</div>
     <hr class="div">
-    <div class="row"><span class="lbl">Reserva de emergência</span><span class="val" style="font-size:12px;">${fmt(poupSaldo)} / ${fmt(reservaMeta)}</span></div>
+    <div class="row"><span class="lbl">Reserva de emergência</span><span class="val" style="font-size:12px;">${fmtH(poupSaldo)} / ${fmtH(reservaMeta)}</span></div>
     <div class="pw"><div class="pf" style="width:${resPct}%;background:#EF9F27;"></div></div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${resPct}% — 6 meses de gastos fixos</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">${pctH(resPct)} — 6 meses de gastos fixos</div>
     <hr class="div">
-    <div class="row"><span class="lbl">Gastos do mês</span><span class="val" style="font-size:12px;">${fmt(gastosReais)} / ${fmt(comprMeta)}</span></div>
+    <div class="row"><span class="lbl">Gastos do mês</span><span class="val" style="font-size:12px;">${fmtH(gastosReais)} / ${fmtH(comprMeta)}</span></div>
     <div class="pw"><div class="pf" style="width:${comprPct}%;background:${comprOk?'var(--green)':'var(--red)'};"></div></div>
-    <div style="font-size:10px;color:var(--text3);">${comprPct}% da meta mensal ${comprOk?'✓':'— acima do limite ⚠️'}</div>`;
+    <div style="font-size:10px;color:var(--text3);">${pctH(comprPct)} da meta mensal ${comprOk?'✓':'— acima do limite ⚠️'}</div>`;
 }
 
 function renderPoup() {
@@ -1244,13 +1257,13 @@ function renderPoup() {
   const deltaColor = delta >= 0 ? 'var(--green)' : 'var(--red)';
   const deltaSign = delta >= 0 ? '+' : '';
   document.getElementById('poup-card').innerHTML=`
-    <div class="row"><span class="lbl">Saldo atual</span><span class="val big pos">${fmt(saldo)}</span></div>
-    <div style="font-size:12px;color:${deltaColor};margin-top:2px;">${deltaSign}${fmt(delta)} vs. registro anterior · ${last[0]||''}</div>
+    <div class="row"><span class="lbl">Saldo atual</span><span class="val big pos">${fmtH(saldo)}</span></div>
+    <div style="font-size:12px;color:${deltaColor};margin-top:2px;">${valuesHidden?"":deltaSign}${fmtH(delta)} vs. registro anterior · ${last[0]||''}</div>
     <hr class="div">
     <div class="row"><span class="lbl">Meta 2026</span><span class="val">${fmt(meta)}</span></div>
-    <div class="row"><span class="lbl">Progresso</span><span class="val pos">${pct}%</span></div>
+    <div class="row"><span class="lbl">Progresso</span><span class="val pos">${pctH(pct)}</span></div>
     <div class="pw"><div class="pf" style="width:${pct}%;background:var(--green);"></div></div>
-    <div style="font-size:10px;color:var(--text3);">Faltam ${fmt(Math.max(0,meta-saldo))} para a meta</div>`;
+    <div style="font-size:10px;color:var(--text3);">${valuesHidden?"":"Faltam "+fmt(Math.max(0,meta-saldo))+" para a meta"}</div>`;
   const canvas=document.getElementById('poupChart'); if(!canvas) return;
   if(poupChart) poupChart.destroy();
   // Labels: show dd/mm for dates in same month, or Mon/YY for monthly
@@ -1510,6 +1523,25 @@ async function submitTx() {
 }
 
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+// ── HIDE VALUES ──────────────────────────────────────────
+let valuesHidden = false;
+function toggleHide() {
+  valuesHidden = !valuesHidden;
+  document.getElementById('hide-icon').className = valuesHidden ? 'ti ti-eye-off' : 'ti ti-eye';
+  document.getElementById('hide-btn').style.color = valuesHidden ? 'var(--green)' : 'var(--text3)';
+  renderHome();
+  renderHealth();
+  renderPoup();
+}
+function fmtH(v) {
+  if (valuesHidden) return '<span style="letter-spacing:2px;opacity:.45;font-size:11px;">● ● ● ●</span>';
+  return fmt(v);
+}
+function pctH(v) {
+  if (valuesHidden) return '<span style="letter-spacing:2px;opacity:.45;font-size:11px;">● ●%</span>';
+  return v + '%';
+}
+
 document.getElementById("month-label").textContent = curMonthLabel();
 document.getElementById("cat-month-label").textContent = catMonthLabel();
 loadAll();
