@@ -533,7 +533,7 @@ const BASE = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}`;
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyFgaTu-X51Qb2LEc3W5ZHu2VtuOgfZquT6UuGtZbODeA-9ItvtDNWvUAUI761DvEno/exec';
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-let curM = 4, curY = 2026, catM = 4, catY = 2026;
+const _now = new Date(); let curM = _now.getMonth(), curY = _now.getFullYear(), catM = _now.getMonth(), catY = _now.getFullYear();
 let txData = [], ccData = [], swileData = [], reimbData = [], poupData = [], metasData = [];
 let usdData = [], eurData = [];
 let editingRow = null, editingSheet = null, selectedTx = null;
