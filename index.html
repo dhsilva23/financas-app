@@ -889,16 +889,6 @@ function buildCCTabs() {
   // Default: first month >= current that is not fully paid
   const curLabel = MONTHS[curM]+' '+curY;
   const curKey = curY*12+curM;
-  console.log('curKey:', curKey, 'curLabel:', curLabel);
-  console.log('all months:', months);
-  months.forEach(m => {
-    const [ma,ya] = m.split(' ');
-    const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
-    const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase());
-    const statuses = rows.map(r=>r[7]||'');
-    const allPaid = rows.every(r=>['pago','estorno'].includes((r[7]||'').toLowerCase()));
-    console.log(m, '| key:', key, '| rows:', rows.length, '| statuses:', statuses, '| allPaid:', allPaid);
-  });
   const defaultMonth = months.find(m => {
     const [ma,ya] = m.split(' ');
     const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
