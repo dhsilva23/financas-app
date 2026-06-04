@@ -1470,13 +1470,25 @@ async function submitTx() {
       if (reimbRow) await appendRow('Reembolsos',reimbRow);
       if (cat==='Pagamento Fatura C6'&&window._faturaToMark) {
         const {label,ccIndices}=window._faturaToMark;
-        const freshCCRows=ccData.filter(r=>(r[6]||'').toLowerCase()===label.toLowerCase());
-        const rowsToMark=freshCCRows.length>0?freshCCRows:ccIndices.map(i=>ccData[i]).filter(Boolean);
+        // Use ccIndices (captured at time of pagarFatura click) as primary source
+        // fallback to label match
+        const rowsToMark = ccIndices.length > 0
+          ? ccIndices.map(i=>ccData[i]).filter(Boolean)
+          : ccData.filter(r=>(r[6]||'').toLowerCase()===label.toLowerCase());
+        let marked = 0;
         for (const ccRow of rowsToMark) {
           const ccIdx=ccData.indexOf(ccRow);
-          if (ccIdx>=0) { const u=[...ccRow]; while(u.length<9) u.push(''); u[7]='Pago'; await updateRow('CartaoC6',ccIdx+2,u); }
+          if (ccIdx>=0) {
+            const u=[...ccRow]; while(u.length<10) u.push('');
+            u[7]='Pago';
+            await updateRow('CartaoC6',ccIdx+2,u);
+            marked++;
+          }
         }
-        window._faturaToMark=null; await loadAll(); resetAddForm(); buildCCTabs(); showToast('Fatura marcada como paga! ✓'); return;
+        window._faturaToMark=null;
+        await loadAll(); resetAddForm(); buildCCTabs();
+        showToast(`Fatura marcada como paga! ${marked} lançamentos atualizados ✓`);
+        return;
       }
       showToast('Lançamento salvo! ✓');
     }
