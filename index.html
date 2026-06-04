@@ -883,8 +883,10 @@ async function deleteTx() {
 
 function buildCCTabs() {
   const months=[...new Set(ccData.map(r=>r[6]).filter(Boolean))].sort((a,b)=>{
-    const [ma,ya]=a.split(' '); const [mb,yb]=b.split(' ');
-    return (parseInt(ya)-parseInt(yb))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
+    const pa=a.split(' '), pb=b.split(' ');
+    const ma=pa[0].charAt(0).toUpperCase()+pa[0].slice(1).toLowerCase();
+    const mb=pb[0].charAt(0).toUpperCase()+pb[0].slice(1).toLowerCase();
+    return (parseInt(pa[1])-parseInt(pb[1]))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
   // Default: first month >= current that is not fully paid
   const curLabel = MONTHS[curM]+' '+curY;
