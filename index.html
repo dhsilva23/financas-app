@@ -886,20 +886,25 @@ function buildCCTabs() {
     const [ma,ya]=a.split(' '); const [mb,yb]=b.split(' ');
     return (parseInt(ya)-parseInt(yb))||(MONTHS.indexOf(ma)-MONTHS.indexOf(mb));
   });
-  // Default to current month if unpaid, otherwise next unpaid, fallback to current
+  // Default: prefer current month; if fully paid, go to next month
   const curLabel = MONTHS[curM]+' '+curY;
-  const curOrNext = months.find(m => {
-    const [ma,ya] = m.split(' ');
-    const key = parseInt(ya)*12 + MONTHS.indexOf(ma);
-    const curKey = curY*12 + curM;
-    if (key < curKey) return false; // skip past months
-    const ml = m.toLowerCase();
-    const rows = ccData.filter(r=>(r[6]||'').toLowerCase()===ml);
-    if (rows.length === 0) return false; // skip months with no data
-    const paga = rows.every(r=>(r[7]||'').toLowerCase()==='pago');
-    return !paga; // first unpaid from current month onwards
-  });
-  const defaultMonth = curOrNext || months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
+  const curMonthRows = ccData.filter(r=>(r[6]||'').toLowerCase()===curLabel.toLowerCase());
+  const curMonthPaga = curMonthRows.length>0 && curMonthRows.every(r=>(r[7]||'').toLowerCase()==='pago');
+  let defaultMonth;
+  if (!curMonthPaga && curMonthRows.length>0) {
+    // Current month has data and is not fully paid
+    defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase());
+  }
+  if (!defaultMonth) {
+    // Find the very next month after current with data
+    const curKey = curY*12+curM;
+    defaultMonth = months.find(m=>{
+      const [ma,ya]=m.split(' ');
+      const key=parseInt(ya)*12+MONTHS.indexOf(ma);
+      return key===curKey+1 && ccData.filter(r=>(r[6]||'').toLowerCase()===m.toLowerCase()).length>0;
+    });
+  }
+  if (!defaultMonth) defaultMonth = months.find(m=>m.toLowerCase()===curLabel.toLowerCase()) || months[months.length-1];
   document.getElementById('cc-tabs').innerHTML=months.map(m=>
     `<button class="cct${m===defaultMonth?' active':''}" onclick="setCCMonth('${m}',this)">${m.split(' ')[0]} ${m.split(' ')[1].slice(2)}</button>`
   ).join('');
