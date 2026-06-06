@@ -174,12 +174,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
       <div class="hdr">
         <h1>Minhas Finanças</h1>
         <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="toggleSearch()" id="search-btn" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:0 4px;line-height:1;"><i class="ti ti-search"></i></button>
           <button onclick="toggleHide()" id="hide-btn" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:0 4px;line-height:1;"><i class="ti ti-eye" id="hide-icon"></i></button>
           <div class="mnav">
             <button onclick="changeMonth(-1)">‹</button>
             <span id="month-label">Maio 2026</span>
             <button onclick="changeMonth(1)">›</button>
           </div>
+        </div>
+      </div>
+      <div id="search-bar" style="display:none;padding:10px 18px;border-bottom:0.5px solid var(--border);background:var(--bg);">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border-radius:var(--r-md);padding:8px 12px;">
+          <i class="ti ti-search" style="color:var(--text3);font-size:16px;flex-shrink:0;"></i>
+          <input type="text" id="search-input" placeholder="Buscar lançamentos..." 
+            style="border:none;background:none;font-size:14px;color:var(--text);width:100%;outline:none;font-family:var(--font);"
+            oninput="renderHome()">
+          <button onclick="clearSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0;"><i class="ti ti-x"></i></button>
         </div>
       </div>
       <div class="sec" style="padding-top:14px;">
@@ -771,14 +781,20 @@ function renderHome() {
       totEmp>0 ? `${fmt(totEmp)} a receber da empresa` : `${fmt(totPes)} a receber de pessoas`;
   } else { banner.style.display='none'; }
 
-  const allMonthTx = [...monthTx].sort((a,b)=>{
+  const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+  const filteredTx = searchQuery
+    ? monthTx.filter(r => (r[2]||'').toLowerCase().includes(searchQuery) || (r[3]||'').toLowerCase().includes(searchQuery) || (r[5]||'').toLowerCase().includes(searchQuery))
+    : monthTx;
+  const allMonthTx = [...filteredTx].sort((a,b)=>{
     const toDate = s => { if(!s) return 0; const p=s.split('/'); return new Date(p[2],p[1]-1,p[0]); };
     return toDate(b[0])-toDate(a[0]);
   });
-  document.getElementById('home-txs-label').textContent = `lançamentos do mês (${allMonthTx.length})`;
+  document.getElementById('home-txs-label').textContent = searchQuery
+    ? `resultados para "${searchQuery}" (${allMonthTx.length})`
+    : `lançamentos do mês (${allMonthTx.length})`;
   document.getElementById('home-txs').innerHTML = allMonthTx.length
     ? allMonthTx.map(r => txRow(r, txData.indexOf(r), 'Lancamentos')).join('')
-    : '<div class="empty">Nenhum lançamento este mês</div>';
+    : `<div class="empty">${searchQuery ? 'Nenhum resultado para "'+searchQuery+'"' : 'Nenhum lançamento este mês'}</div>`;
 }
 
 const catColors = {
@@ -1523,6 +1539,46 @@ async function submitTx() {
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
 // ── HIDE VALUES ──────────────────────────────────────────
 let valuesHidden = false;
+function toggleSearch() {
+  const bar = document.getElementById('search-bar');
+  const btn = document.getElementById('search-btn');
+  const isOpen = bar.style.display !== 'none';
+  bar.style.display = isOpen ? 'none' : 'block';
+  btn.style.color = isOpen ? 'var(--text3)' : 'var(--green)';
+  if (!isOpen) {
+    document.getElementById('search-input').focus();
+  } else {
+    document.getElementById('search-input').value = '';
+    renderHome();
+  }
+}
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-bar').style.display = 'none';
+  document.getElementById('search-btn').style.color = 'var(--text3)';
+  renderHome();
+}
+
+function toggleSearch() {
+  const bar = document.getElementById('search-bar');
+  const btn = document.getElementById('search-btn');
+  const isOpen = bar.style.display !== 'none';
+  bar.style.display = isOpen ? 'none' : 'block';
+  btn.style.color = isOpen ? 'var(--text3)' : 'var(--green)';
+  if (!isOpen) {
+    setTimeout(() => document.getElementById('search-input').focus(), 50);
+  } else {
+    document.getElementById('search-input').value = '';
+    renderHome();
+  }
+}
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-bar').style.display = 'none';
+  document.getElementById('search-btn').style.color = 'var(--text3)';
+  renderHome();
+}
+
 function toggleHide() {
   valuesHidden = !valuesHidden;
   document.getElementById('hide-icon').className = valuesHidden ? 'ti ti-eye-off' : 'ti ti-eye';
