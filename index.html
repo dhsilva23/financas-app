@@ -567,6 +567,68 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
   </div>
 </div>
 
+<!-- Modal: editar lançamento C6 -->
+<div class="modal-bg" id="cc-edit-modal">
+  <div class="modal-sheet">
+    <h2>Editar lançamento C6</h2>
+    <div class="fg"><label>Descrição</label><input type="text" id="cce-desc"></div>
+    <div class="fg"><label>Categoria</label>
+      <select id="cce-cat">
+        <option>Moradia</option><option>Casa & Decoração</option><option>Alimentação</option>
+        <option>Transporte</option><option>Saúde</option><option>Beleza & Cuidados</option>
+        <option>Moda & Acessórios</option><option>Lazer</option><option>Viagens (pessoal)</option>
+        <option>Assinaturas</option><option>Jimmy</option><option>Dízimo/Doações</option>
+        <option>Despesa Reembolsável</option><option>Investimentos/Poupança</option><option>Outros</option>
+      </select>
+    </div>
+    <div class="fg"><label>Valor da parcela (R$)</label>
+      <input type="text" inputmode="decimal" id="cce-val" oninput="maskCurrency(this)" style="font-size:20px;font-weight:600;">
+    </div>
+    <div class="fg"><label>Data</label><input type="date" id="cce-date"></div>
+    <div class="fg"><label>Cartão</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="tbtn" id="cce-card-0314" onclick="selCCECard('0314',this)">· · 0314</button>
+        <button type="button" class="tbtn" id="cce-card-0222" onclick="selCCECard('0222',this)">· · 0222</button>
+      </div>
+    </div>
+    <div class="fg"><label>Observação</label><input type="text" id="cce-obs"></div>
+    <button class="sbtn" onclick="saveCCEdit()">✓ Salvar alterações</button>
+    <button class="bbtn danger" onclick="confirmCCDelete()" style="color:var(--red);">🗑 Excluir lançamento</button>
+    <button class="bbtn" onclick="closeCCEditModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal: editar lançamento C6 -->
+<div class="modal-bg" id="cc-edit-modal">
+  <div class="modal-sheet">
+    <h2>Editar lançamento C6</h2>
+    <div class="fg"><label>Descrição</label><input type="text" id="cce-desc"></div>
+    <div class="fg"><label>Categoria</label>
+      <select id="cce-cat">
+        <option>Moradia</option><option>Casa & Decoração</option><option>Alimentação</option>
+        <option>Transporte</option><option>Saúde</option><option>Beleza & Cuidados</option>
+        <option>Moda & Acessórios</option><option>Lazer</option><option>Viagens (pessoal)</option>
+        <option>Assinaturas</option><option>Jimmy</option><option>Dízimo/Doações</option>
+        <option>Despesa Reembolsável</option><option>Investimentos/Poupança</option><option>Outros</option>
+      </select>
+    </div>
+    <div class="fg"><label>Valor da parcela (R$)</label>
+      <input type="text" inputmode="decimal" id="cce-val" oninput="maskCurrency(this)" style="font-size:20px;font-weight:600;">
+    </div>
+    <div class="fg"><label>Data</label><input type="date" id="cce-date"></div>
+    <div class="fg"><label>Cartão</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button type="button" class="tbtn" id="cce-card-0314" onclick="selCCECard('0314',this)">· · 0314</button>
+        <button type="button" class="tbtn" id="cce-card-0222" onclick="selCCECard('0222',this)">· · 0222</button>
+      </div>
+    </div>
+    <div class="fg"><label>Observação</label><input type="text" id="cce-obs"></div>
+    <button class="sbtn" onclick="saveCCEdit()">✓ Salvar alterações</button>
+    <button class="bbtn" style="color:var(--red);margin-top:10px;width:100%;background:none;border:none;font-size:12px;cursor:pointer;" onclick="confirmCCDelete()">🗑 Excluir lançamento</button>
+    <button class="bbtn" onclick="closeCCEditModal()">Cancelar</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
@@ -904,7 +966,11 @@ async function confirmRealize() {
 }
 function editTx() {
   const {idx, sheet} = selectedTx||{}; closeModal(); selectedTx=null;
-  const r = sheet==='Lancamentos' ? txData[idx] : ccData[idx];
+  if (sheet === 'CartaoC6') {
+    openCCEditModal(idx);
+    return;
+  }
+  const r = txData[idx];
   editingRow=idx+2; editingSheet=sheet;
   document.getElementById('add-title').textContent='Editar Lançamento';
   document.getElementById('delete-btn').style.display='block';
@@ -916,6 +982,61 @@ function editTx() {
   document.getElementById('inp-date').value=parseDate(r[0]);
   document.getElementById('inp-obs').value=r[8]||'';
   goTo('add');
+}
+
+let ccEditIdx = null;
+function openCCEditModal(idx) {
+  ccEditIdx = idx;
+  const r = ccData[idx];
+  document.getElementById('cce-desc').value = r[1]||'';
+  document.getElementById('cce-cat').value = r[2]||'Outros';
+  document.getElementById('cce-val').value = parseVal(r[3]).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('cce-date').value = parseDate(r[0]);
+  document.getElementById('cce-obs').value = r[8]||'';
+  // Set card button
+  const card = (r[9]||'').toString().trim();
+  ['0314','0222'].forEach(k => {
+    const btn = document.getElementById('cce-card-'+k);
+    btn.className = 'tbtn' + (card===k?' ainc':'');
+  });
+  document.getElementById('cc-edit-modal').classList.add('open');
+}
+function closeCCEditModal() {
+  document.getElementById('cc-edit-modal').classList.remove('open');
+  ccEditIdx = null;
+}
+function selCCECard(card, el) {
+  ['0314','0222'].forEach(k => document.getElementById('cce-card-'+k).className = 'tbtn');
+  el.className = 'tbtn ainc';
+}
+async function saveCCEdit() {
+  if (ccEditIdx === null) return;
+  const r = ccData[ccEditIdx];
+  const desc = document.getElementById('cce-desc').value;
+  const cat = document.getElementById('cce-cat').value;
+  const val = parseVal(document.getElementById('cce-val').value);
+  const rawDate = document.getElementById('cce-date').value;
+  const obs = document.getElementById('cce-obs').value;
+  const activeCard = document.querySelector('#cce-card-0314.ainc,#cce-card-0222.ainc');
+  const card = activeCard ? activeCard.id.replace('cce-card-','') : (r[9]||'');
+  const dp = rawDate.split('-');
+  const dateFormatted = `${dp[2]}/${dp[1]}/${dp[0]}`;
+  const updated = [...r];
+  updated[0]=dateFormatted; updated[1]=desc; updated[2]=cat;
+  updated[3]=val; updated[5]=val; updated[8]=obs; updated[9]=card;
+  while(updated.length<10) updated.push('');
+  showToast('Salvando...'); closeCCEditModal();
+  await updateRow('CartaoC6', ccEditIdx+2, updated);
+  await loadAll(); buildCCTabs();
+  showToast('Lançamento C6 atualizado! ✓');
+}
+async function confirmCCDelete() {
+  if (!confirm('Excluir este lançamento do C6?')) return;
+  showToast('Excluindo...');
+  closeCCEditModal();
+  await clearRow('CartaoC6', ccEditIdx+2);
+  await loadAll(); buildCCTabs();
+  showToast('Lançamento excluído!');
 }
 function parseDate(d) {
   if (!d) return new Date().toISOString().split('T')[0];
