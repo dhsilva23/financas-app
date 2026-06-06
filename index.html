@@ -1092,11 +1092,23 @@ function setCCMonthRender(m) {
     <hr class="div"><div class="sec-lbl" style="margin-bottom:8px;">por categoria</div>
     ${catHtml||'<div class="empty">Sem lançamentos</div>'}`;
   document.getElementById('cc-txs').innerHTML=rows.length
-    ? rows.map(r=>{const ri=ccData.indexOf(r);return `<div class="tx" onclick="openTxModal(${ri},'CartaoC6')">
-        <div class="tx-ico" style="background:${r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7'};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
-        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
-        <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
-      </div>`;}).join('')
+    ? rows.map(r=>{
+        const ri=ccData.indexOf(r);
+        const uid='cctx-'+ri;
+        const bgIco=r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7';
+        return `<div class="tx-wrap" id="${uid}">
+          <div class="tx-edit-bg" onclick="swipeEditCC(${ri},'${uid}')"><i class="ti ti-pencil"></i></div>
+          <div class="tx-del-bg" onclick="swipeDeleteCC(${ri},'${uid}')"><i class="ti ti-trash"></i></div>
+          <div class="tx-inner" onclick="openTxModal(${ri},'CartaoC6')"
+            ontouchstart="swipeStart(event,'${uid}')"
+            ontouchmove="swipeMove(event,'${uid}')"
+            ontouchend="swipeEndCC(event,'${uid}',${ri})">
+            <div class="tx-ico" style="background:${bgIco};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
+            <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
+            <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
+          </div>
+        </div>`;
+      }).join('')
     : '<div class="empty">Nenhum lançamento nesta fatura</div>';
 }
 
