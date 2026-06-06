@@ -157,12 +157,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
 .tx-inner{position:relative;background:var(--bg);transition:transform .2s ease;touch-action:pan-y;}
 .tx-inner.swiped{transform:translateX(-80px);}
 
-/* Swipe to delete */
+/* Swipe to delete/edit */
 .tx-wrap{position:relative;overflow:hidden;border-bottom:0.5px solid var(--border);}
 .tx-wrap:last-child{border-bottom:none;}
 .tx-del-bg{position:absolute;right:0;top:0;bottom:0;width:75px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
+.tx-edit-bg{position:absolute;left:0;top:0;bottom:0;width:75px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
 .tx-inner{position:relative;background:var(--bg);transition:transform .25s ease;touch-action:pan-y;display:flex;align-items:center;gap:12px;padding:11px 0;}
-.tx-inner.swiped{transform:translateX(-75px);}
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:rgba(20,20,24,.92);color:#fff;padding:11px 20px;border-radius:22px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px);}
 .toast.show{opacity:1;}
 /* Insights */
@@ -852,6 +852,7 @@ function txRow(r, idx, sheet) {
   const chips = (isProj?'<span class="chip chip-p">Projeção</span>':'')+(isReimb?'<span class="chip chip-r">Reembolso</span>':'');
   const uid = `tx-${idx}-${sheet.replace(/[^a-z]/gi,'')}`;
   return `<div class="tx-wrap" id="${uid}">
+    <div class="tx-edit-bg" onclick="swipeEdit(${idx},'${sheet}','${uid}')"><i class="ti ti-pencil"></i></div>
     <div class="tx-del-bg" onclick="swipeDelete(${idx},'${sheet}','${uid}')"><i class="ti ti-trash"></i></div>
     <div class="tx-inner" onclick="openTxModal(${idx},'${sheet}')"
       ontouchstart="swipeStart(event,'${uid}')"
