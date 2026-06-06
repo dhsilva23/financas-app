@@ -151,6 +151,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
 @keyframes spin{to{transform:rotate(360deg);}}
 .empty{text-align:center;padding:32px 20px;color:var(--text3);font-size:13px;}
 /* Toast */
+/* Swipe to delete */
+.tx-wrap{position:relative;overflow:hidden;}
+.tx-del-bg{position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;border-radius:0 var(--r-md) var(--r-md) 0;}
+.tx-inner{position:relative;background:var(--bg);transition:transform .2s ease;touch-action:pan-y;}
+.tx-inner.swiped{transform:translateX(-80px);}
+
+/* Swipe to delete */
+.tx-wrap{position:relative;overflow:hidden;border-bottom:0.5px solid var(--border);}
+.tx-wrap:last-child{border-bottom:none;}
+.tx-del-bg{position:absolute;right:0;top:0;bottom:0;width:75px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
+.tx-inner{position:relative;background:var(--bg);transition:transform .25s ease;touch-action:pan-y;display:flex;align-items:center;gap:12px;padding:11px 0;}
+.tx-inner.swiped{transform:translateX(-75px);}
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:rgba(20,20,24,.92);color:#fff;padding:11px 20px;border-radius:22px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px);}
 .toast.show{opacity:1;}
 /* Insights */
@@ -838,10 +850,17 @@ function txRow(r, idx, sheet) {
   const icon = isInc ? 'building-bank' : (catIcons[cat]||'dots');
   const amtClass = isInc ? 'inc' : isProj ? 'prj' : isReimb ? 'rmb' : 'exp';
   const chips = (isProj?'<span class="chip chip-p">Projeção</span>':'')+(isReimb?'<span class="chip chip-r">Reembolso</span>':'');
-  return `<div class="tx" onclick="openTxModal(${idx},'${sheet}')">
-    <div class="tx-ico" style="background:${bgColor};"><i class="ti ti-${icon}" style="color:${color};"></i></div>
-    <div class="tx-info"><div class="tx-desc">${r[2]||''}${chips}</div><div class="tx-meta">${r[5]||''} · ${cat||r[1]||''}</div></div>
-    <div class="tx-r"><div class="tx-amt ${amtClass}">${isInc?'+':'−'}${fmt(r[4])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
+  const uid = `tx-${idx}-${sheet.replace(/[^a-z]/gi,'')}`;
+  return `<div class="tx-wrap" id="${uid}">
+    <div class="tx-del-bg" onclick="swipeDelete(${idx},'${sheet}','${uid}')"><i class="ti ti-trash"></i></div>
+    <div class="tx-inner" onclick="openTxModal(${idx},'${sheet}')"
+      ontouchstart="swipeStart(event,'${uid}')"
+      ontouchmove="swipeMove(event,'${uid}')"
+      ontouchend="swipeEnd(event,'${uid}')">
+      <div class="tx-ico" style="background:${bgColor};"><i class="ti ti-${icon}" style="color:${color};"></i></div>
+      <div class="tx-info"><div class="tx-desc">${r[2]||''}${chips}</div><div class="tx-meta">${r[5]||''} · ${cat||r[1]||''}</div></div>
+      <div class="tx-r"><div class="tx-amt ${amtClass}">${isInc?'+':'−'}${fmt(r[4])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
+    </div>
   </div>`;
 }
 
@@ -1570,6 +1589,63 @@ function toggleSearch() {
     renderHome();
   }
 }
+// ── SWIPE TO DELETE ─────────────────────────────────────
+let swipeStartX = 0, swipeCurrentX = 0, swipeActive = null;
+const SWIPE_THRESHOLD = 50;
+
+function swipeStart(e, uid) {
+  swipeStartX = e.touches[0].clientX;
+  swipeActive = uid;
+}
+function swipeMove(e, uid) {
+  if (swipeActive !== uid) return;
+  swipeCurrentX = e.touches[0].clientX;
+  const diff = swipeStartX - swipeCurrentX;
+  const inner = document.querySelector(`#${uid} .tx-inner`);
+  if (!inner) return;
+  if (diff > 0) {
+    inner.style.transition = 'none';
+    inner.style.transform = `translateX(${Math.min(-diff, -75)}px)`;
+  }
+}
+function swipeEnd(e, uid) {
+  if (swipeActive !== uid) return;
+  const diff = swipeStartX - swipeCurrentX;
+  const inner = document.querySelector(`#${uid} .tx-inner`);
+  if (!inner) return;
+  inner.style.transition = 'transform .25s ease';
+  if (diff > SWIPE_THRESHOLD) {
+    inner.classList.add('swiped');
+    // Close any other open swipes
+    document.querySelectorAll('.tx-inner.swiped').forEach(el => {
+      if (el !== inner) { el.classList.remove('swiped'); el.style.transform = ''; }
+    });
+  } else {
+    inner.classList.remove('swiped');
+    inner.style.transform = '';
+  }
+  swipeActive = null;
+}
+async function swipeDelete(idx, sheet, uid) {
+  if (!confirm('Excluir este lançamento?')) {
+    const inner = document.querySelector(`#${uid} .tx-inner`);
+    if (inner) { inner.classList.remove('swiped'); inner.style.transform = ''; }
+    return;
+  }
+  showToast('Excluindo...');
+  await clearRow(sheet, idx + 2);
+  await loadAll();
+  showToast('Lançamento excluído!');
+}
+
+// Close swipes when scrolling
+document.getElementById('screens').addEventListener('scroll', () => {
+  document.querySelectorAll('.tx-inner.swiped').forEach(el => {
+    el.classList.remove('swiped'); el.style.transform = '';
+  });
+});
+
+// ── SWIPE TO DELETE ─────────────────────────────────────
 function toggleCCSearch() {
   const bar = document.getElementById('cc-search-bar');
   const btn = document.getElementById('cc-search-btn');
