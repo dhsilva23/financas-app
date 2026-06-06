@@ -1081,7 +1081,7 @@ function setCCMonthRender(m) {
   document.getElementById('cc-txs').innerHTML=rows.length
     ? rows.map(r=>{const ri=ccData.indexOf(r);return `<div class="tx" onclick="openTxModal(${ri},'CartaoC6')">
         <div class="tx-ico" style="background:${r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7'};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
-        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''}${r[4]>1?' · <span style="background:#EEF2FF;color:#3B5BDB;font-size:9px;padding:1px 5px;border-radius:6px;font-weight:600;">'+r[4]+'x</span>':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
+        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''}${(r[4]&&String(r[4]).includes('/'))?' · <span style="background:#EEF2FF;color:#3B5BDB;font-size:9px;padding:1px 5px;border-radius:6px;font-weight:600;">'+r[4]+'</span>':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
         <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
       </div>`;}).join('')
     : '<div class="empty">Nenhum lançamento nesta fatura</div>';
