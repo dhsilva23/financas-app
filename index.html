@@ -157,12 +157,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);}
 .tx-inner{position:relative;background:var(--bg);transition:transform .2s ease;touch-action:pan-y;}
 .tx-inner.swiped{transform:translateX(-80px);}
 
-/* Swipe to delete/edit */
-.tx-wrap{position:relative;overflow:hidden;border-bottom:0.5px solid var(--border);}
-.tx-wrap:last-child{border-bottom:none;}
-.tx-del-bg{position:absolute;right:0;top:0;bottom:0;width:75px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
-.tx-edit-bg{position:absolute;left:0;top:0;bottom:0;width:75px;background:var(--blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;}
-.tx-inner{position:relative;background:var(--bg);transition:transform .25s ease;touch-action:pan-y;display:flex;align-items:center;gap:12px;padding:11px 0;}
+
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:rgba(20,20,24,.92);color:#fff;padding:11px 20px;border-radius:22px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;backdrop-filter:blur(8px);}
 .toast.show{opacity:1;}
 /* Insights */
@@ -881,18 +876,10 @@ function txRow(r, idx, sheet) {
   const icon = isInc ? 'building-bank' : (catIcons[cat]||'dots');
   const amtClass = isInc ? 'inc' : isProj ? 'prj' : isReimb ? 'rmb' : 'exp';
   const chips = (isProj?'<span class="chip chip-p">Projeção</span>':'')+(isReimb?'<span class="chip chip-r">Reembolso</span>':'');
-  const uid = `tx-${idx}-${sheet.replace(/[^a-z]/gi,'')}`;
-  return `<div class="tx-wrap" id="${uid}">
-    <div class="tx-edit-bg" onclick="swipeEdit(${idx},'${sheet}','${uid}')"><i class="ti ti-pencil"></i></div>
-    <div class="tx-del-bg" onclick="swipeDelete(${idx},'${sheet}','${uid}')"><i class="ti ti-trash"></i></div>
-    <div class="tx-inner" onclick="openTxModal(${idx},'${sheet}')"
-      ontouchstart="swipeStart(event,'${uid}')"
-      ontouchmove="swipeMove(event,'${uid}')"
-      ontouchend="swipeEnd(event,'${uid}')">
-      <div class="tx-ico" style="background:${bgColor};"><i class="ti ti-${icon}" style="color:${color};"></i></div>
-      <div class="tx-info"><div class="tx-desc">${r[2]||''}${chips}</div><div class="tx-meta">${r[5]||''} · ${cat||r[1]||''}</div></div>
-      <div class="tx-r"><div class="tx-amt ${amtClass}">${isInc?'+':'−'}${fmt(r[4])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
-    </div>
+  return `<div class="tx" onclick="openTxModal(${idx},'${sheet}')">
+    <div class="tx-ico" style="background:${bgColor};"><i class="ti ti-${icon}" style="color:${color};"></i></div>
+    <div class="tx-info"><div class="tx-desc">${r[2]||''}${chips}</div><div class="tx-meta">${r[5]||''} · ${cat||r[1]||''}</div></div>
+    <div class="tx-r"><div class="tx-amt ${amtClass}">${isInc?'+':'−'}${fmt(r[4])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
   </div>`;
 }
 
@@ -1092,23 +1079,11 @@ function setCCMonthRender(m) {
     <hr class="div"><div class="sec-lbl" style="margin-bottom:8px;">por categoria</div>
     ${catHtml||'<div class="empty">Sem lançamentos</div>'}`;
   document.getElementById('cc-txs').innerHTML=rows.length
-    ? rows.map(r=>{
-        const ri=ccData.indexOf(r);
-        const uid='cctx-'+ri;
-        const bgIco=r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7';
-        return `<div class="tx-wrap" id="${uid}">
-          <div class="tx-edit-bg" onclick="swipeEditCC(${ri},'${uid}')"><i class="ti ti-pencil"></i></div>
-          <div class="tx-del-bg" onclick="swipeDeleteCC(${ri},'${uid}')"><i class="ti ti-trash"></i></div>
-          <div class="tx-inner" onclick="openTxModal(${ri},'CartaoC6')"
-            ontouchstart="swipeStart(event,'${uid}')"
-            ontouchmove="swipeMove(event,'${uid}')"
-            ontouchend="swipeEndCC(event,'${uid}',${ri})">
-            <div class="tx-ico" style="background:${bgIco};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
-            <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
-            <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
-          </div>
-        </div>`;
-      }).join('')
+    ? rows.map(r=>{const ri=ccData.indexOf(r);return `<div class="tx" onclick="openTxModal(${ri},'CartaoC6')">
+        <div class="tx-ico" style="background:${r[7]==='Pago'?'#E1F5EE':r[7]==='Projeção'?'#EEF2FF':'#FAECE7'};"><i class="ti ti-${catIcons[r[2]]||'credit-card'}" style="color:${catColors[r[2]]||'#888'};"></i></div>
+        <div class="tx-info"><div class="tx-desc">${r[1]||''}</div><div class="tx-meta">${r[2]||''} · ${r[4]>1?r[4]+'x':''}${r[9]?' · <span style="font-size:10px;">Final '+r[9]+'</span>':''}</div></div>
+        <div class="tx-r"><div class="tx-amt exp">−${fmt(r[3])}</div><div class="tx-dt">${(r[0]||'').substring(0,5)}</div></div>
+      </div>`;}).join('')
     : '<div class="empty">Nenhum lançamento nesta fatura</div>';
 }
 
